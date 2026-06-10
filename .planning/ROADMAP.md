@@ -3,7 +3,7 @@
 Created 2026-06-10 (autonomous ceremony). 4 coarse phases per SUMMARY.md's roadmap implications;
 ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to exactly one phase.
 
-## Phase 1 — Skeleton + State (no LLM)
+## Phase 1 — Skeleton + State (no LLM) — ✓ Complete 2026-06-10 (verification: human_needed, 16/17, one cosmetic network-blocked re-run)
 
 **Goal:** A loadable, inert, state-capable plugin — proven against the live install.
 

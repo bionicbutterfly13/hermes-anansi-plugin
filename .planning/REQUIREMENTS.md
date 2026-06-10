@@ -9,18 +9,18 @@ quality). Feature IDs (T*/D*) reference `.planning/research/FEATURES.md`.
 
 ### PLUG — Plugin integration
 
-- [ ] **PLUG-01** Plugin loads via hermes-agent's standard mechanism: `plugin.yaml` with explicit `kind: standalone` and `provides_hooks`, `register(ctx)` with zero import-time side effects, installable at `$HERMES_HOME/plugins/anansi` (maps: skeleton; SUMMARY Key Decision 6a)
-- [ ] **PLUG-02** Every hook accepts `**kwargs` and tolerates unknown/missing kwargs (dispatcher injects extras; strict signatures TypeError every call)
-- [ ] **PLUG-03** The strings `MemoryProvider`/`register_memory_provider` never appear in `__init__.py` (manifest string-scan silently coerces plugin kind)
-- [ ] **PLUG-04** `pre_llm_call` returns `{"context": block}` or `None` — injection into user message only; system prompt never touched (host invariant)
+- [x] **PLUG-01** Plugin loads via hermes-agent's standard mechanism: `plugin.yaml` with explicit `kind: standalone` and `provides_hooks`, `register(ctx)` with zero import-time side effects, installable at `$HERMES_HOME/plugins/anansi` (maps: skeleton; SUMMARY Key Decision 6a)
+- [x] **PLUG-02** Every hook accepts `**kwargs` and tolerates unknown/missing kwargs (dispatcher injects extras; strict signatures TypeError every call)
+- [x] **PLUG-03** The strings `MemoryProvider`/`register_memory_provider` never appear in `__init__.py` (manifest string-scan silently coerces plugin kind)
+- [x] **PLUG-04** `pre_llm_call` returns `{"context": block}` or `None` — injection into user message only; system prompt never touched (host invariant)
 
 ### STATE — Local appraisal state (T8)
 
-- [ ] **STATE-01** SQLite store under `$HERMES_HOME` (path from config/env, never literal) with schema: affect_summary, concerns, contradictions, trust_scores, turn_log, schema_version
-- [ ] **STATE-02** WAL mode, synchronous=NORMAL, busy_timeout=5000; hot-path reads via read-only URI snapshot; writes confined to reflection pass
-- [ ] **STATE-03** Corrupt/locked/absent DB → quarantine-and-recreate (or skip), never a raised exception into the turn
-- [ ] **STATE-04** All state tables have caps + decay/pruning (anti: unbounded growth/hidden profiling); state stays local (privacy constraint)
-- [ ] **STATE-05** State round-trip covered by tests (write → reload → identical signals)
+- [x] **STATE-01** SQLite store under `$HERMES_HOME` (path from config/env, never literal) with schema: affect_summary, concerns, contradictions, trust_scores, turn_log, schema_version
+- [x] **STATE-02** WAL mode, synchronous=NORMAL, busy_timeout=5000; hot-path reads via read-only URI snapshot; writes confined to reflection pass
+- [x] **STATE-03** Corrupt/locked/absent DB → quarantine-and-recreate (or skip), never a raised exception into the turn
+- [x] **STATE-04** All state tables have caps + decay/pruning (anti: unbounded growth/hidden profiling); state stays local (privacy constraint)
+- [x] **STATE-05** State round-trip covered by tests (write → reload → identical signals)
 
 ### APPR — Appraisal pre-phase (T1–T7, D4, D7)
 
@@ -76,4 +76,4 @@ quality). Feature IDs (T*/D*) reference `.planning/research/FEATURES.md`.
 | Postgres/AGE/RabbitMQ/Ollama/UI | Original Anansi infra; this plugin is SQLite-only, Docker-free |
 
 ---
-*Last updated: 2026-06-10 — initial v1 definition (autonomous ceremony)*
+*Last updated: 2026-06-10 — PLUG-01..04 + STATE-01..05 delivered by Phase 1 (see 01-VERIFICATION.md)*

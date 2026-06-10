@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-06-10)
 
 **Core value:** Every Hermes turn gets a grounded metacognitive appraisal injected before response generation — with zero capacity for autonomous action and zero impact on turn reliability.
-**Current focus:** Phase 1 — Skeleton + State
+**Current focus:** Phase 2 — Appraisal Path (the core)
 
 ## Current Position
 
-Phase: 1 of 4 (Skeleton + State)
+Phase: 2 of 4 (Appraisal Path)
 Plan: 1 of 2 complete in current phase (01-01 done; 01-02 state store next)
 Status: Executing phase 1
-Last activity: 2026-06-10 — Phase 1 executed (2 plans, both complete); verifier next
+Last activity: 2026-06-10 — Phase 1 complete (16/17 verified, human_needed: one cosmetic completed-turn re-run blocked by machine-wide HTTPS outage)
 
 Progress: [█░░░░░░░░░] 12%
 
