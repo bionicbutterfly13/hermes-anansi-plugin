@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-06-10)
 Phase: 2 of 4 (Appraisal Path)
 Plan: 1 of 2 complete in current phase (01-01 done; 01-02 state store next)
 Status: Executing phase 1
-Last activity: 2026-06-10 — Phase 2 context captured (discuss-phase, autonomous)
+Last activity: 2026-06-10 — Plan 02-01 complete (offline appraisal path, 49 tests); 02-02 live validation next
 
 Progress: [█░░░░░░░░░] 12%
 
