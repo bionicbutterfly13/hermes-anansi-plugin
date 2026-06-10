@@ -1,6 +1,6 @@
 ---
 phase: 1
-status: human_needed
+status: passed
 verified: 2026-06-10
 ---
 
@@ -97,3 +97,19 @@ Requirements 9/9 covered; ROADMAP criteria 1–4 evidenced.
 
 Nothing in the plugin path depends on the network; the outage affected only the
 host's provider call. No gaps found in the delivered work itself.
+
+### 2026-06-10 (~9:55am EDT, during Plan 02-02): human-needed item CLOSED
+
+Network recovered; the exact command was run during Plan 02-02 live validation:
+
+```
+$ HERMES_PLUGINS_DEBUG=1 hermes -z "Reply with exactly: OK"   # exit 0
+output (tail): OK
+grep -c "Traceback" /tmp/anansi2-phase1-close.txt  -> 0
+grep -c "\[anansi"   /tmp/anansi2-phase1-close.txt  -> 0
+```
+
+Directly-observed completed turn with the store wiring active: output `OK`, no
+`[anansi` leakage, no traceback (full capture: `/tmp/anansi2-phase1-close.txt`).
+Plan 01-02 must-have 7 is now direct evidence; Phase 1 verification 17/17 — status
+updated to `passed`.
