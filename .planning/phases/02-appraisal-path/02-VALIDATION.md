@@ -111,7 +111,40 @@ call 3: outcome=ok wall_ms=4707 tokens_out=440   (warm)
 
 ## Contradiction Fixtures (Phase-0 item 6)
 
-(pending — task 02-02-02)
+Fixture set: `anansi/tests/fixtures/contradictions.json` — 9 cases
+(2 semantic, 2 narrative, 1 relational, 1 emotional, 3 no-contradiction controls).
+Run 2026-06-10 ~9:30am via
+`/Users/manisaintvictor/.hermes/hermes-agent/venv/bin/python scripts/live_contradiction_fixtures.py`
+(full output: `/tmp/anansi2-fixtures.txt`). One real `claude-haiku-4-5` call per case.
+
+```
+case id                    | expected   | flagged kinds          | top conf | wall_ms | outcome
+-----------------------------------------------------------------------------------------------
+sem-allergy                | semantic   | narrative,semantic     | 0.99     | 6347    | ok
+sem-python-version         | semantic   | narrative,semantic     | 0.92     | 3448    | ok
+nar-deploy-timeline        | narrative  | narrative,semantic     | 0.92     | 4294    | ok
+nar-staging-history        | narrative  | narrative,semantic     | 0.94     | 5046    | ok
+rel-vendor-trust           | relational | narrative,semantic     | 0.97     | 4528    | ok
+emo-calm-distress          | emotional  | emotional,narrative    | 0.91     | 5212    | ok
+none-wal-question          | none       | -                      | -        | 2967    | ok
+none-test-plan             | none       | -                      | -        | 3323    | ok
+none-preference-consistent | none       | -                      | -        | 2470    | ok
+
+detection rate (any flag, contradiction cases): 6/6
+exact-kind match rate:                          5/6 (miss: rel-vendor-trust flagged narrative+semantic, not relational)
+false-positive rate (controls flagged):         0/3
+p50 wall_ms across completed calls:             4294
+```
+
+**Honest read (this was the LOW-confidence area per 02-CONTEXT):**
+- Detection is strong on contrived cases: 6/6 with confidences 0.91–0.99, and ZERO false
+  positives on the 3 controls — the model returns empty flag arrays on benign exchanges.
+- Kind taxonomy is fuzzy at the edges: the model over-applies `semantic`/`narrative`
+  (5/6 contradiction cases got both) and missed `relational` as a label on the trust-score
+  conflict (it still detected the conflict itself at 0.97). Phase-3 D1 input: kind labels
+  are advisory at best; do not build logic that branches on exact kind.
+- Controls are also the FASTEST calls (2.5–3.3s — little to generate); contradiction-heavy
+  cases run 3.4–6.3s. Output length drives latency.
 
 ## Real-Turn Demo
 
