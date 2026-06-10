@@ -167,8 +167,8 @@ This project uses **learnship**. Key facts:
 <!-- Updated automatically by platform workflows -->
 
 **Milestone:** v1.0 — Hermes Anansi Metacognition Plugin
-**Phase:** 1 — Skeleton + State ✓ complete → Phase 2 — Appraisal Path
-**Status:** verifying (16/17; one cosmetic network-blocked re-run)
+**Phase:** 2 — Appraisal Path
+**Status:** executing (plans verified)
 **Last updated:** 2026-06-10 (phase 1 complete)
 
 ---
