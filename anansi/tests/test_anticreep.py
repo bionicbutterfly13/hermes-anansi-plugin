@@ -52,7 +52,8 @@ def _sanity_module_inventory():
 
 def test_scan_targets_are_the_plugin_modules():
     assert _sanity_module_inventory() == {
-        "__init__.py", "appraisal.py", "config.py", "render.py", "store.py",
+        "__init__.py", "appraisal.py", "config.py", "reflection.py",
+        "render.py", "store.py",
     }
 
 

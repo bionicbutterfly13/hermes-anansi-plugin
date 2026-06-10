@@ -218,6 +218,10 @@ def test_get_cfg_defaults_when_host_config_unavailable(monkeypatch):
         "history_chars": 4000,
         "model": None,
         "max_tokens": 700,
+        "reflection_enabled": True,
+        "reflect_every_n_turns": 5,
+        "reflect_max_tokens": 700,
+        "reflect_deadline_seconds": 8.0,
     }
     # SAFE-01 (R1, 2026-06-10): the in-code default deadline is 8.0s.
     assert cfg["deadline_seconds"] == config.DEFAULT_DEADLINE_SECONDS == 8.0
@@ -252,6 +256,27 @@ def test_get_cfg_reads_entry_and_clamps(monkeypatch):
     cfg = config.get_cfg(force_reload=True)
     assert cfg["confidence_threshold"] == 0.0
     assert cfg["deadline_seconds"] == 0.5
+
+    # Reflection keys (REFL-01): coerced + clamped like everything else.
+    monkeypatch.setattr(
+        config,
+        "_load_host_entry",
+        lambda: {
+            "reflection_enabled": "off",       # recognized string -> False
+            "reflect_every_n_turns": 999,      # clamp -> 50
+            "reflect_max_tokens": "garbage",   # default -> 700
+            "reflect_deadline_seconds": 0.05,  # clamp -> 0.5
+        },
+    )
+    cfg = config.get_cfg(force_reload=True)
+    assert cfg["reflection_enabled"] is False
+    assert cfg["reflect_every_n_turns"] == 50
+    assert cfg["reflect_max_tokens"] == 700
+    assert cfg["reflect_deadline_seconds"] == 0.5
+    monkeypatch.setattr(
+        config, "_load_host_entry", lambda: {"reflect_every_n_turns": 0}
+    )
+    assert config.get_cfg(force_reload=True)["reflect_every_n_turns"] == 1
 
 
 def test_get_cfg_cached_until_reset(monkeypatch):

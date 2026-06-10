@@ -239,6 +239,10 @@ _DEFAULTS = {
     "history_chars": 4000,
     "model": None,
     "max_tokens": 700,
+    "reflection_enabled": True,
+    "reflect_every_n_turns": 5,
+    "reflect_max_tokens": 700,
+    "reflect_deadline_seconds": 8.0,
 }
 
 

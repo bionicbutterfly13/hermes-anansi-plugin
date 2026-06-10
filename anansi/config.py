@@ -8,11 +8,18 @@ per session (on_session_start calls reset_cache(); long-lived gateway
 processes serve many sessions — PITFALLS G6).
 
 Plugin-own keys (read from the entry dict):
-    enabled               bool, default True   — kill switch (APPR-07)
+    enabled               bool, default True   — kill switch (APPR-07);
+                          also gates reflection (checked in maybe_reflect)
     confidence_threshold  float, clamped [0,1], default 0.6 (APPR-03)
     deadline_seconds      float, clamped [0.5, 10.0], default 8.0 (R1)
     history_chars         int, default 4000
     max_tokens            int, default 700
+
+Reflection keys (REFL-01, Phase 3):
+    reflection_enabled        bool, default True — reflection-only switch
+    reflect_every_n_turns     int, clamped [1, 50], default 5 — debounce
+    reflect_max_tokens        int, default 700
+    reflect_deadline_seconds  float, clamped [0.5, 10.0], default 8.0
 
 Requested model (host trust gate — we only read WHICH model to request;
 allow_model_override / allowed_models are enforced by the host):
@@ -35,6 +42,10 @@ DEFAULT_DEADLINE_SECONDS = 8.0
 DEFAULT_HISTORY_CHARS = 4000
 DEFAULT_MODEL = None  # no override requested by default
 DEFAULT_MAX_TOKENS = 700
+DEFAULT_REFLECTION_ENABLED = True
+DEFAULT_REFLECT_EVERY_N_TURNS = 5
+DEFAULT_REFLECT_MAX_TOKENS = 700
+DEFAULT_REFLECT_DEADLINE_SECONDS = 8.0
 
 _cache = None
 
@@ -89,12 +100,13 @@ def _coerce_float(value, default, lo, hi):
     return max(lo, min(hi, result))
 
 
-def _coerce_int(value, default, lo):
+def _coerce_int(value, default, lo, hi=None):
     try:
         result = int(value)
     except (TypeError, ValueError):
         return default
-    return max(lo, result)
+    result = max(lo, result)
+    return min(hi, result) if hi is not None else result
 
 
 def get_cfg(force_reload=False) -> dict:
@@ -122,6 +134,20 @@ def get_cfg(force_reload=False) -> dict:
         ),
         "model": model,
         "max_tokens": _coerce_int(entry.get("max_tokens"), DEFAULT_MAX_TOKENS, 1),
+        "reflection_enabled": _coerce_bool(
+            entry.get("reflection_enabled"), DEFAULT_REFLECTION_ENABLED
+        ),
+        "reflect_every_n_turns": _coerce_int(
+            entry.get("reflect_every_n_turns"),
+            DEFAULT_REFLECT_EVERY_N_TURNS, 1, 50,
+        ),
+        "reflect_max_tokens": _coerce_int(
+            entry.get("reflect_max_tokens"), DEFAULT_REFLECT_MAX_TOKENS, 1
+        ),
+        "reflect_deadline_seconds": _coerce_float(
+            entry.get("reflect_deadline_seconds"),
+            DEFAULT_REFLECT_DEADLINE_SECONDS, 0.5, 10.0,
+        ),
     }
     return _cache
 
