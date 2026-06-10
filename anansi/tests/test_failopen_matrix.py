@@ -14,7 +14,7 @@ outcome row exists, and module state is left sane.
 | trust rejection -> single fallback        | test_appraisal.py::test_trust_fallback_retries_once_without_override                                         | referenced    |
 | parse_fail (run_appraisal level)          | test_appraisal.py::test_parse_fail_paths                                                                     | referenced    |
 | unwritable telemetry DB                   | test_pre_llm_call.py::test_unwritable_telemetry_is_silent                                                    | referenced    |
-| corrupt-DB quarantine                     | test_store.py::test_corrupt_db_quarantined; test_telemetry_store.py::test_v1_db_quarantined_and_recreated_as_v2 | referenced |
+| corrupt-DB quarantine                     | test_store.py::test_corrupt_db_quarantined; test_telemetry_store.py::test_v1_db_quarantined_and_recreated_at_current_schema | referenced |
 | absent DB                                 | test_store.py::test_absent_db_read_returns_none; test_telemetry_store.py::test_record_telemetry_absent_or_corrupt_path_returns_false | referenced |
 | kill switch                               | test_pre_llm_call.py::test_kill_switch_skips_llm                                                             | referenced    |
 | empty / duplicate / social-closer gates   | test_pre_llm_call.py::test_empty_message_skipped, ::test_duplicate_gate_within_session, ::test_social_closer_skipped | referenced |

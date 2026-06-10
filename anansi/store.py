@@ -14,9 +14,12 @@ Contract (see .planning/phases/01-skeleton-state/01-CONTEXT.md, all locked):
   hot-path safe (OBS-01).
 - Disposable-state doctrine: ANY structural problem (corruption, schema_version
   mismatch, missing table, failed open) -> quarantine + recreate fresh. No
-  migration framework.
+  migration framework. v2 DBs quarantine-recreate at v3 on the first
+  ensure_db after deploy (Phase-2 telemetry evidence is durable in
+  02-VALIDATION.md) — expected, not a regression.
 - No public function in this module may raise to a caller. Failure values:
-  ensure_db -> False, read_snapshot -> None, apply_deltas -> False.
+  ensure_db -> False, read_snapshot -> None, apply_deltas -> False,
+  get_meta -> None, read_turns_since -> [].
 """
 
 import json
@@ -29,7 +32,7 @@ from pathlib import Path
 
 logger = logging.getLogger("hermes.plugins.anansi.store")
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Per-table row caps (seed values; tune later with telemetry).
 CAPS = {
@@ -67,8 +70,15 @@ _SCHEMA_DDL = (
                                      resolved INTEGER DEFAULT 0, decayed_weight REAL, expires_at TEXT,
                                      created_at TEXT)""",
     """CREATE TABLE trust_scores    (key TEXT PRIMARY KEY, value REAL NOT NULL, updated_at TEXT)""",
+    # Schema v3 (REFL-01..03): turn_log gains assistant_excerpt (reflection
+    # digests need the assistant side of each turn); the meta table carries
+    # the reflection watermark keys (last_reflected_turn_log_id,
+    # last_seen_session_id). Existing v2 DBs fail _verify_structure (version
+    # mismatch) and are quarantine-recreated — disposable-state doctrine,
+    # no migration code.
     """CREATE TABLE turn_log        (id INTEGER PRIMARY KEY, session_id TEXT, turn_id TEXT,
-                                     user_excerpt TEXT, appraisal_json TEXT, created_at TEXT)""",
+                                     user_excerpt TEXT, assistant_excerpt TEXT,
+                                     appraisal_json TEXT, created_at TEXT)""",
     # Schema v2 (OBS-01): per-appraisal-call telemetry. Existing v1 DBs fail
     # _verify_structure (version mismatch + missing table) and are
     # quarantine-recreated — disposable-state doctrine, no migration code.
@@ -226,11 +236,45 @@ def _rows_as_dicts(conn, table: str) -> list:
     return [dict(zip(cols, row)) for row in cur.fetchall()]
 
 
-def read_snapshot(db_path=None):
+# Lazy concern decay (03-CONTEXT, locked): heartbeat semantics without a
+# scheduler. Computed at READ time only — reads never write; rows that fell
+# below the prune threshold actually die in the reflection pass
+# (reflection.apply_reflection composes concerns_prune).
+_DECAY_HALF_LIFE_DAYS = 7.0
+DECAY_PRUNE_THRESHOLD = 0.1
+
+
+def _effective_weight(row, now):
+    """weight * 0.5 ** (days_idle / 7), days_idle from updated_at
+    (fallback created_at). Non-numeric weight or unparseable timestamp ->
+    no decay (effective == weight). Never raises."""
+    weight = row.get("weight")
+    try:
+        weight_value = float(weight)
+    except (TypeError, ValueError):
+        return weight
+    ts_text = row.get("updated_at") or row.get("created_at")
+    try:
+        ts = datetime.fromisoformat(str(ts_text))
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        days_idle = max(0.0, (now - ts).total_seconds() / 86400.0)
+    except (TypeError, ValueError):
+        return weight_value
+    return weight_value * 0.5 ** (days_idle / _DECAY_HALF_LIFE_DAYS)
+
+
+def read_snapshot(db_path=None, include_decayed=False):
     """Hot-path read over a read-only URI connection.
 
     Returns the snapshot dict, or None on ANY error (absent file, locked,
     corrupt, missing table). Never raises, never creates files.
+
+    Each concerns row gains ``effective_weight`` (lazy decay, see
+    _effective_weight); rows whose effective weight fell below
+    DECAY_PRUNE_THRESHOLD are EXCLUDED from the snapshot unless
+    ``include_decayed=True`` (the reflection pass's raw view — it needs the
+    decayed rows to compose concerns_prune). Reads never write.
     """
     conn = None
     try:
@@ -247,10 +291,22 @@ def read_snapshot(db_path=None):
         arow = cur.fetchone()
         if arow is not None:
             affect = dict(zip([c[0] for c in cur.description], arow))
+        now = datetime.now(timezone.utc)
+        concerns = []
+        for concern in _rows_as_dicts(conn, "concerns"):
+            effective = _effective_weight(concern, now)
+            concern["effective_weight"] = effective
+            if not include_decayed:
+                try:
+                    if float(effective) < DECAY_PRUNE_THRESHOLD:
+                        continue
+                except (TypeError, ValueError):
+                    pass  # non-numeric: include undecayed (defensive)
+            concerns.append(concern)
         snapshot = {
             "schema_version": schema_version,
             "affect_summary": affect,
-            "concerns": _rows_as_dicts(conn, "concerns"),
+            "concerns": concerns,
             "contradictions": _rows_as_dicts(conn, "contradictions"),
             "trust_scores": {
                 key: value
@@ -273,17 +329,74 @@ def read_snapshot(db_path=None):
                 pass
 
 
-def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms: int = 5000) -> bool:
-    """THE single write entry point — one transaction, caps enforced inside it.
+def get_meta(key, db_path=None):
+    """Read one meta value over a read-only URI connection.
 
-    Recognized delta keys: affect_summary, concerns_add, concerns_resolve,
-    contradictions_add, trust_scores, turn_log_add. Unknown keys are ignored
-    with a debug log. Returns True on commit, False on ANY error (the
-    transaction is rolled back). Never raises.
+    Returns the stored string, or None on absent key / absent file / lock /
+    any other error. Never raises, never creates files.
     """
     conn = None
     try:
         path = Path(db_path) if db_path is not None else get_db_path()
+        conn = sqlite3.connect("file:%s?mode=ro" % path, uri=True)
+        row = conn.execute(
+            "SELECT value FROM meta WHERE key=?", (str(key),)
+        ).fetchone()
+        return row[0] if row is not None else None
+    except Exception as exc:
+        logger.debug("anansi get_meta(%r) failed (degrading): %s", key, exc)
+        return None
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def read_turns_since(after_id, db_path=None, limit=50):
+    """turn_log rows with id > after_id, ordered by id ascending, capped.
+
+    Read-only URI connection; returns [] on ANY error (absent file, locked,
+    corrupt). Never raises, never creates files.
+    """
+    conn = None
+    try:
+        path = Path(db_path) if db_path is not None else get_db_path()
+        conn = sqlite3.connect("file:%s?mode=ro" % path, uri=True)
+        cur = conn.execute(
+            "SELECT * FROM turn_log WHERE id > ? ORDER BY id LIMIT ?",
+            (int(after_id), int(limit)),
+        )
+        cols = [c[0] for c in cur.description]
+        return [dict(zip(cols, row)) for row in cur.fetchall()]
+    except Exception as exc:
+        logger.debug("anansi read_turns_since failed (degrading): %s", exc)
+        return []
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
+    """THE single write entry point — one transaction, caps enforced inside it.
+
+    Recognized delta keys: affect_summary, concerns_add, concerns_update,
+    concerns_resolve, concerns_prune, contradictions_add,
+    contradictions_resolve, trust_scores, turn_log_add, meta_set. Unknown
+    keys are ignored with a debug log. This function stays MECHANICAL —
+    clamping/policy (delta bounds, decay math, baselines) lives in the
+    callers (reflection.py). Returns True on commit, False on ANY error
+    (the transaction is rolled back). Never raises.
+    """
+    conn = None
+    try:
+        path = Path(db_path) if db_path is not None else get_db_path()
+        if busy_timeout_ms is None:
+            busy_timeout_ms = _DEFAULT_BUSY_TIMEOUT_MS
         now = _utc_now_iso()
         conn = sqlite3.connect(str(path))
         conn.execute("PRAGMA busy_timeout=%d" % int(busy_timeout_ms))
@@ -315,12 +428,27 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms: int = 5000) -> boo
                             " VALUES (?, ?, 'open', ?, ?)",
                             (item.get("text"), item.get("weight", 1.0), now, now),
                         )
+                elif key == "concerns_update":
+                    # Absolute weights, pre-clamped by the caller
+                    # (reflection.py owns the policy).
+                    for item in payload:
+                        conn.execute(
+                            "UPDATE concerns SET weight=?, updated_at=?"
+                            " WHERE id=?",
+                            (item.get("weight"), now, item.get("id")),
+                        )
                 elif key == "concerns_resolve":
                     for concern_id in payload:
                         conn.execute(
                             "UPDATE concerns SET status='resolved', updated_at=?"
                             " WHERE id=?",
                             (now, concern_id),
+                        )
+                elif key == "concerns_prune":
+                    # Decay-prune (the only deletion besides cap-eviction).
+                    for concern_id in payload:
+                        conn.execute(
+                            "DELETE FROM concerns WHERE id=?", (concern_id,)
                         )
                 elif key == "contradictions_add":
                     for item in payload:
@@ -334,6 +462,22 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms: int = 5000) -> boo
                                 item.get("evidence"),
                                 now,
                             ),
+                        )
+                elif key == "contradictions_resolve":
+                    for contradiction_id in payload:
+                        conn.execute(
+                            "UPDATE contradictions SET resolved=1 WHERE id=?",
+                            (contradiction_id,),
+                        )
+                elif key == "meta_set":
+                    # Reflection bookkeeping (watermark + last-seen session);
+                    # values stored as str.
+                    for meta_key, meta_value in (payload or {}).items():
+                        conn.execute(
+                            "INSERT INTO meta (key, value) VALUES (?, ?)"
+                            " ON CONFLICT(key) DO UPDATE SET"
+                            " value=excluded.value",
+                            (str(meta_key), str(meta_value)),
                         )
                 elif key == "trust_scores":
                     for score_key, score_value in payload.items():
@@ -351,12 +495,14 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms: int = 5000) -> boo
                             appraisal = json.dumps(appraisal, ensure_ascii=False)
                         conn.execute(
                             "INSERT INTO turn_log"
-                            " (session_id, turn_id, user_excerpt, appraisal_json,"
-                            " created_at) VALUES (?, ?, ?, ?, ?)",
+                            " (session_id, turn_id, user_excerpt,"
+                            " assistant_excerpt, appraisal_json, created_at)"
+                            " VALUES (?, ?, ?, ?, ?, ?)",
                             (
                                 item.get("session_id"),
                                 item.get("turn_id"),
                                 item.get("user_excerpt"),
+                                item.get("assistant_excerpt"),
                                 appraisal,
                                 now,
                             ),

@@ -1,4 +1,5 @@
-"""Telemetry store (schema v2) + config module tests.
+"""Telemetry store (schema v2-era; current version = store.SCHEMA_VERSION) +
+config module tests.
 
 Every store test uses tmp_path with explicit db_path= — the real
 $HERMES_HOME is never touched. Direct sqlite3 use is test instrumentation
@@ -48,11 +49,11 @@ def _create_v1_db(db):
 
 
 # ---------------------------------------------------------------------------
-# Schema v2
+# Schema quarantine (v1 -> current)
 # ---------------------------------------------------------------------------
 
 
-def test_v1_db_quarantined_and_recreated_as_v2(tmp_path):
+def test_v1_db_quarantined_and_recreated_at_current_schema(tmp_path):
     db = tmp_path / "state.db"
     _create_v1_db(db)
     assert store.ensure_db(db) is True
@@ -67,10 +68,9 @@ def test_v1_db_quarantined_and_recreated_as_v2(tmp_path):
         row = conn.execute(
             "SELECT value FROM meta WHERE key='schema_version'"
         ).fetchone()
-        assert row == ("2",)
+        assert row == (str(store.SCHEMA_VERSION),)
     finally:
         conn.close()
-    assert store.SCHEMA_VERSION == 2
     assert store.CAPS["telemetry"] == 2000
 
 
