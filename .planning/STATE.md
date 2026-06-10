@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-06-10)
 ## Current Position
 
 Phase: 3 of 4 (Fail-Open Hardening + Reflection)
-Plan: 03-02 COMPLETE (2 of 3) — 03-03 (live validation) next
-Status: Plan 03-02 executed — schema v3, reflection engine (debounce + idempotent single-transaction apply, ±0.15 bounds, echo exclusion, lazy decay + reflection-pass prune), hooks wired (post_llm_call capture; session triggers), REFL-04/05 surfacing, matrix reflection rows filled, offline cross-session demo green; suite 68 → 105 via ./scripts/test.sh
-Last activity: 2026-06-10 — Plan 03-02 complete (701549d, 7c1c235, 85897d8): reflection is the carrier — offline proof in test_reflection_demo.py; live proof is 03-03
+Plan: 03-03 COMPLETE (3 of 3) — phase 3 execution complete, ready for verification
+Status: Plan 03-03 executed — live cross-session loop proven (ROADMAP criterion 3): session-A JWT/opaque-token contradiction reflected (reflect_ok 5616ms, contradiction id 2, trust 0.5→0.38) and surfaced verbatim in session B's block on attempt 1/1 incl. trust note; idempotence probed live (watermark stable across no-new-turn firings); p50 appraisal 5563ms ≤6s target; all 4 criteria evidenced in 03-VALIDATION.md; suite 105 green post-live-work
+Last activity: 2026-06-10 — Plan 03-03 complete (183d41e): 03-VALIDATION.md written; next step verify-work for Phase 3
 
-Progress: [███████░░░] 67%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
+- Total plans completed: 7
 - Average duration: ~1 session
-- Total execution time: ~6 hours
+- Total execution time: ~6.5 hours
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: [███████░░░] 67%
 |-------|-------|-------|----------|
 | 1 — Skeleton + State | 2/2 | ~2h | ~1h |
 | 2 — Appraisal Path | 2/2 | ~2h | ~1h |
-| 3 — Fail-Open + Reflection | 2/3 | ~2h | ~1h |
+| 3 — Fail-Open + Reflection | 3/3 | ~2.5h | ~1h |
 
 ## Accumulated Decisions
 
@@ -57,8 +57,10 @@ Progress: [███████░░░] 67%
 - ~~One-turn-lag ack~~ RESOLVED 2026-06-10: accepted by Dr. Mani; reflection carries appraisal context across the lag (R2)
 - ~~p50 5501ms vs ≤1.0s target~~ RESOLVED 2026-06-10: target revised to p50 ≤6s / 8.0s deadline, max quality (R1, Dr. Mani decision)
 - Upstream-main parity of ctx.llm facade + manifest keys must be re-verified before Phase 4 PR
+- `telemetry_summary` failure_count/last_error counts reflect_* outcomes as failures (vocabulary predates reflection) — Phase-4 doc/fix candidate (03-VALIDATION.md §6)
+- Host sub-sessions run the full hook set (appraisal + capture + reflection per sub-session; parallel haiku appraisals can contend into timeout — fail-open held live) — Phase-4 doc note (03-VALIDATION.md §9)
 
 ## Session Continuity
 
 Last session: 2026-06-10 (autonomous)
-Stopped at: Plan 03-02 complete (SUMMARY written, suite 105 green via ./scripts/test.sh; offline cross-session demo proven); next step execute 03-03 (live validation — note: live v2 state.db quarantine-recreates at v3 on the first brand-new session)
+Stopped at: Plan 03-03 complete (03-VALIDATION.md committed 183d41e; SUMMARY written; suite 105 green) — Phase 3 execution complete; next step verify-work for Phase 3
