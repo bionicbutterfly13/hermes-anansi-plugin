@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-06-10)
 ## Current Position
 
 Phase: 3 of 4 (Fail-Open Hardening + Reflection)
-Plan: 03-01 COMPLETE (1 of 3) — 03-02 (reflection engine) next
-Status: Plan 03-01 executed — SAFE-01 default aligned (8.0s), SAFE-02 non-reflection matrix green, SAFE-03 corpus + SAFE-04 static scans green; suite 49 → 68 via ./scripts/test.sh
-Last activity: 2026-06-10 — Plan 03-01 complete (e846443, 7186ecd, ad7871e): repo-local test idiom (scripts/test.sh + .devtools staging), fail-open matrix, anti-creep proofs
+Plan: 03-02 COMPLETE (2 of 3) — 03-03 (live validation) next
+Status: Plan 03-02 executed — schema v3, reflection engine (debounce + idempotent single-transaction apply, ±0.15 bounds, echo exclusion, lazy decay + reflection-pass prune), hooks wired (post_llm_call capture; session triggers), REFL-04/05 surfacing, matrix reflection rows filled, offline cross-session demo green; suite 68 → 105 via ./scripts/test.sh
+Last activity: 2026-06-10 — Plan 03-02 complete (701549d, 7c1c235, 85897d8): reflection is the carrier — offline proof in test_reflection_demo.py; live proof is 03-03
 
-Progress: [██████░░░░] 58%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
+- Total plans completed: 6
 - Average duration: ~1 session
-- Total execution time: ~5 hours
+- Total execution time: ~6 hours
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: [██████░░░░] 58%
 |-------|-------|-------|----------|
 | 1 — Skeleton + State | 2/2 | ~2h | ~1h |
 | 2 — Appraisal Path | 2/2 | ~2h | ~1h |
-| 3 — Fail-Open + Reflection | 1/3 | ~1h | ~1h |
+| 3 — Fail-Open + Reflection | 2/3 | ~2h | ~1h |
 
 ## Accumulated Decisions
 
@@ -49,6 +49,8 @@ Progress: [██████░░░░] 58%
 | WAL `BEGIN EXCLUSIVE` never blocks readers (== IMMEDIATE); reader-blocking lock tests need a rollback-journal tmp DB | 3 | Verified empirically 2026-06-10; locked-DB matrix rows assert both truths (test_failopen_matrix.py) |
 | Bare second-person directive payload text quoted as reported material by render._sanitize_text (SAFE-03) | 3 | "you should migrate now" rendered structurally directive; quoting keeps the line observational |
 | Dev tooling staged repo-locally (.devtools/pytest via uv --target); hermes venv never modified | 3 | uv-sync wipe risk locked in 03-CONTEXT; ./scripts/test.sh is the canonical test command |
+| Reflection raw read = `read_snapshot(include_decayed=True)` flag, not a second reader; apply_deltas busy-timeout default follows `_DEFAULT_BUSY_TIMEOUT_MS` | 3 | store.py stays the only sqlite surface; locked-DB tests govern the real write path (03-02) |
+| jsonschema (4.26.0) is live in the hermes venv: schema-rejected docs surface as parse_fail host-side; vocabulary-gating tested at the parse layer | 3 | Same split as Phase 2's parse_signals; full-path fake payloads must validate (03-02) |
 
 ## Blockers / Concerns
 
@@ -59,4 +61,4 @@ Progress: [██████░░░░] 58%
 ## Session Continuity
 
 Last session: 2026-06-10 (autonomous)
-Stopped at: Plan 03-01 complete (SUMMARY written, suite 68 green via ./scripts/test.sh); next step execute 03-02 (reflection engine)
+Stopped at: Plan 03-02 complete (SUMMARY written, suite 105 green via ./scripts/test.sh; offline cross-session demo proven); next step execute 03-03 (live validation — note: live v2 state.db quarantine-recreates at v3 on the first brand-new session)
