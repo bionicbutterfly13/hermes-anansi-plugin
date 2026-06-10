@@ -11,8 +11,8 @@ See: .planning/PROJECT.md (updated 2026-06-10)
 
 Phase: 1 of 4 (Skeleton + State)
 Plan: 0 of 0 in current phase
-Status: Ready to discuss (run discuss-phase 1)
-Last activity: 2026-06-10 — Project initialized via autonomous new-project ceremony (research + requirements + roadmap)
+Status: Ready to plan (run plan-phase 1)
+Last activity: 2026-06-10 — Phase 1 context captured (discuss-phase, autonomous)
 
 Progress: [░░░░░░░░░░] 0%
 
