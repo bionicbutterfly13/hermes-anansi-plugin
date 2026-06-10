@@ -232,7 +232,7 @@ def run_appraisal(*, llm, user_message, conversation_history, snapshot, cfg) -> 
 
     try:
         threshold = float(cfg.get("confidence_threshold", 0.6))
-        deadline = float(cfg.get("deadline_seconds", 2.5))
+        deadline = float(cfg.get("deadline_seconds", 8.0))
         requested_model = cfg.get("model") or None
 
         try:

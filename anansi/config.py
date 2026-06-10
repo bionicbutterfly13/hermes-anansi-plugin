@@ -10,7 +10,7 @@ processes serve many sessions — PITFALLS G6).
 Plugin-own keys (read from the entry dict):
     enabled               bool, default True   — kill switch (APPR-07)
     confidence_threshold  float, clamped [0,1], default 0.6 (APPR-03)
-    deadline_seconds      float, clamped [0.5, 10.0], default 2.5
+    deadline_seconds      float, clamped [0.5, 10.0], default 8.0 (R1)
     history_chars         int, default 4000
     max_tokens            int, default 700
 
@@ -31,7 +31,7 @@ logger = logging.getLogger("hermes.plugins.anansi.config")
 
 DEFAULT_ENABLED = True
 DEFAULT_CONFIDENCE_THRESHOLD = 0.6
-DEFAULT_DEADLINE_SECONDS = 2.5
+DEFAULT_DEADLINE_SECONDS = 8.0
 DEFAULT_HISTORY_CHARS = 4000
 DEFAULT_MODEL = None  # no override requested by default
 DEFAULT_MAX_TOKENS = 700

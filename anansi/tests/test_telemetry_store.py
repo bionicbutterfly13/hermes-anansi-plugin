@@ -214,11 +214,13 @@ def test_get_cfg_defaults_when_host_config_unavailable(monkeypatch):
     assert cfg == {
         "enabled": True,
         "confidence_threshold": 0.6,
-        "deadline_seconds": 2.5,
+        "deadline_seconds": 8.0,
         "history_chars": 4000,
         "model": None,
         "max_tokens": 700,
     }
+    # SAFE-01 (R1, 2026-06-10): the in-code default deadline is 8.0s.
+    assert cfg["deadline_seconds"] == config.DEFAULT_DEADLINE_SECONDS == 8.0
 
 
 def test_get_cfg_reads_entry_and_clamps(monkeypatch):

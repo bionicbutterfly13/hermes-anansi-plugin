@@ -199,7 +199,7 @@ hermes-anansi-plugin/
 
 ### Project-Specific Conventions
 
-- **Fail-open is law:** no code path in a hook may raise or block; hard appraisal deadline 2.5–3.0s; every failure → empty injection + telemetry row
+- **Fail-open is law:** no code path in a hook may raise or block; configurable executor-bounded deadline, default 8.0s, p50 target ≤6s (R1, 2026-06-10); every failure → empty injection + telemetry row
 - **No autonomy:** observational noun-fields only; no directives, no tool execution, no memory-provider writes, no turn gating (see REQUIREMENTS.md SAFE-04 and the FEATURES.md anti-feature table)
 - **Paths from config/env (`$HERMES_HOME`), never literals** — standing rule for all of Dr. Mani's projects
 - **Manifest landmines:** `kind: standalone` explicit; all hooks accept `**kwargs`; never mention MemoryProvider strings in `__init__.py`
