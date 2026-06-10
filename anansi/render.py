@@ -117,12 +117,23 @@ def _fmt(value) -> str:
         return "0"
 
 
-def render_block(signals) -> Optional[str]:
+# REFL-05: trust values below this render as advisory low-confidence hints.
+_TRUST_HINT_THRESHOLD = 0.4
+_MAX_TRUST_HINTS = 2
+
+
+def render_block(signals, snapshot=None) -> Optional[str]:
     """Render the sanitized [anansi appraisal] block, or None (APPR-04/05).
 
     Top-3 per category, observational phrasing, every interpolated text
     field sanitized. Capped at ~500 tokens (len // 4 heuristic): trailing
     whole lines are dropped — never mid-line truncation.
+
+    When a snapshot is provided, up to 2 trust scores below 0.4 (lowest
+    first) append advisory "- trust note: low confidence on X" lines
+    (REFL-05 — never a gate). Empty-signal suppression is UNCHANGED and
+    takes precedence: hints ride along only when a block already renders
+    (APPR-05 holds); hint lines participate in the existing token cap.
     """
     if not isinstance(signals, dict):
         return None
@@ -171,6 +182,24 @@ def render_block(signals) -> Optional[str]:
         lines.append("- possible memory searches: %s" % quoted)
     if gut:
         lines.append("- gut reaction: %s" % _sanitize_text(gut, 200))
+
+    # REFL-05 advisory trust hints (after the categories, before the cap).
+    if isinstance(snapshot, dict):
+        low_trust = []
+        scores = snapshot.get("trust_scores")
+        for key, value in (scores or {}).items() if isinstance(scores, dict) else []:
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                continue
+            if value < _TRUST_HINT_THRESHOLD:
+                low_trust.append((value, str(key)))
+        low_trust.sort()  # lowest first
+        for value, key in low_trust[:_MAX_TRUST_HINTS]:
+            lines.append(
+                "- trust note: low confidence on %s (%s)"
+                % (_sanitize_text(key, 100), _fmt(value))
+            )
 
     # Cap: drop trailing whole lines until <= ~500 tokens (2000 chars).
     block = "\n".join(lines)

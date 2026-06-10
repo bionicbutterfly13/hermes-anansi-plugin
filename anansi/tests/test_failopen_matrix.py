@@ -1,11 +1,14 @@
-"""THE consolidated SAFE-02 fail-open matrix (Phase 3, plan 03-01).
+"""THE consolidated SAFE-02 fail-open matrix (Phase 3, plans 03-01 + 03-02).
 
-Every SAFE-02 case maps to exactly one row. Rows already proven in Phases 1-2
-are referenced by file::name (never duplicated); the non-reflection NEW rows
-are implemented in this module; reflection rows are placeholders owned by
-plan 03-02. Every implemented case asserts: no exception escapes the hook,
-the injection is empty (hook returns None) or normal, a correct telemetry
-outcome row exists, and module state is left sane.
+Every SAFE-02 case maps to exactly one row. Rows already proven elsewhere
+(Phases 1-2 and test_reflection.py) are referenced by file::name (never
+duplicated); the full-hook-path rows are implemented in this module. Every
+implemented case asserts: no exception escapes the hook, the injection is
+empty (hook returns None) or normal, a correct telemetry outcome row exists
+when recordable, and module state is left sane. For reflection rows "no
+state mutation" means the appraisal-state tables + the
+last_reflected_turn_log_id watermark (last_seen_session_id is exempt —
+written pre-call by design; see reflection.py's module docstring).
 
 | case                                      | proven by                                                                                                    | status        |
 |-------------------------------------------|--------------------------------------------------------------------------------------------------------------|---------------|
@@ -30,9 +33,13 @@ outcome row exists, and module state is left sane.
 | locked DB: read_snapshot                  | ::test_locked_db_read_snapshot_returns_none                                                                  | implemented   |
 | locked DB: apply_deltas                   | ::test_locked_db_apply_deltas_returns_false                                                                  | implemented   |
 | locked DB: full pre_llm_call              | ::test_locked_db_full_hook_still_injects                                                                     | implemented   |
-| reflection idempotency + debounce double-fire | (added by 03-02)                                                                                         | placeholder   |
-| reflection echo-exclusion                 | (added by 03-02)                                                                                             | placeholder   |
-| locked DB during reflection write         | (added by 03-02)                                                                                             | placeholder   |
+| reflection idempotency + debounce double-fire | test_reflection.py::test_idempotence_reflect_twice_same_span, ::test_double_fire_back_to_back_second_is_noop, ::test_debounce_holds_until_five_unreflected_turns | referenced |
+| reflection echo-exclusion                 | test_reflection.py::test_record_turn_strips_sentinel_lines, ::test_build_digest_strips_seeded_sentinel_rows, ::test_sentinel_never_reaches_the_reflection_llm | referenced |
+| locked DB during reflection write         | test_reflection.py::test_locked_db_during_apply_no_partial_state                                            | referenced    |
+| reflect timeout / parse_fail / llm_error  | test_reflection.py::test_timeout_leaves_state_untouched, ::test_parse_fail_leaves_state_untouched, ::test_llm_error_leaves_state_untouched | referenced |
+| on_session_end: no DB + no ctx            | ::test_on_session_end_no_db_no_ctx_returns_none                                                              | implemented   |
+| on_session_end: exploding reflection LLM  | ::test_on_session_end_exploding_llm_fails_open                                                               | implemented   |
+| post_llm_call: locked DB                  | ::test_post_llm_call_locked_db_returns_none                                                                  | implemented   |
 
 Lock-semantics note (verified 2026-06-10 against sqlite3 under the hermes
 venv): in WAL mode — the production arrangement, set at DB creation — a held
@@ -412,3 +419,64 @@ def test_locked_db_full_hook_still_injects(pinned_env, monkeypatch):
     assert pinned_env.state["caller"].calls == 1
     # The ok-row INSERT hit the held lock and degraded silently: zero rows.
     assert _telemetry_rows(pinned_env.db_path) == []
+
+
+# ---------------------------------------------------------------------------
+# Reflection hooks — full registered-hook-path rows (plan 03-02; the
+# engine-level reflection rows live in test_reflection.py, see the table)
+# ---------------------------------------------------------------------------
+
+
+def test_on_session_end_no_db_no_ctx_returns_none(tmp_path, monkeypatch):
+    """on_session_end with NO ctx and NO database: returns None, never
+    raises; nothing is created on disk (no telemetry recordable)."""
+    absent = tmp_path / "absent" / "state.db"
+    monkeypatch.setattr(store, "get_db_path", lambda: absent)
+    monkeypatch.setattr(config, "get_cfg", lambda force_reload=False: dict(_DEFAULTS))
+    monkeypatch.setattr(anansi, "_ctx", None)
+
+    assert anansi.on_session_end(session_id="s1") is None
+    assert not absent.parent.exists()  # nothing created either
+
+
+def test_on_session_end_exploding_llm_fails_open(pinned_env):
+    """on_session_end with a captured turn pending and a reflection LLM that
+    raises: returns None, telemetry records reflect_llm_error."""
+    from anansi import reflection
+
+    assert reflection.record_turn(
+        session_id="s1", turn_id="t1",
+        user_message="topic under discussion",
+        assistant_response="a completed reply",
+    ) is True
+    pinned_env.state["caller"] = _CountingCaller(
+        RuntimeError("reflection provider down")
+    )
+
+    assert anansi.on_session_end(session_id="s1") is None
+    assert pinned_env.state["caller"].calls == 1  # the attempt happened
+    assert _telemetry_rows(pinned_env.db_path)[-1] == ("reflect_llm_error",)
+
+
+def test_post_llm_call_locked_db_returns_none(pinned_env, monkeypatch):
+    """post_llm_call capture against a write-locked DB: returns None, never
+    raises; the blocked turn_log INSERT degrades silently."""
+    monkeypatch.setattr(store, "_DEFAULT_BUSY_TIMEOUT_MS", 100)
+    holder = sqlite3.connect(str(pinned_env.db_path))
+    try:
+        holder.execute("BEGIN EXCLUSIVE")
+        out = anansi.post_llm_call(
+            session_id="s1", turn_id="t1",
+            user_message="msg", assistant_response="resp",
+        )
+    finally:
+        holder.rollback()
+        holder.close()
+
+    assert out is None
+    con = sqlite3.connect(f"file:{pinned_env.db_path}?mode=ro", uri=True)
+    try:
+        count = con.execute("SELECT COUNT(*) FROM turn_log").fetchone()[0]
+    finally:
+        con.close()
+    assert count == 0  # no partial capture landed

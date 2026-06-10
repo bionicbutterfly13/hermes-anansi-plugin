@@ -53,7 +53,9 @@ curiosity, protect; intensity 0-1; a short factual reason; confidence 0-1.
 - salient_observations: things in the inputs worth noticing, as short noun \
 phrases or statements of fact, each with a confidence.
 - contradiction_flags: tensions between inputs. kind is one of semantic, \
-narrative, relational, emotional; a short text describing the tension; confidence.
+narrative, relational, emotional; a short text describing the tension; confidence. \
+When a persisted contradiction in the state dump is relevant to the current \
+message, re-surface it as a contradiction_flag referencing what changed.
 - suggested_memory_searches: up to 3 short advisory search phrases (text only — \
 nobody is obligated to run them).
 - gut_reaction: one sentence (max 200 characters) of overall felt sense, or "".

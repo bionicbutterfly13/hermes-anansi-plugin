@@ -2,7 +2,10 @@
 
 Observational per-turn appraisal with zero autonomy. Phase 2: pre_llm_call
 runs one deadline-bounded JSON appraisal via ctx.llm and injects a compact
-sanitized block; on_session_end remains a no-op until Phase 3 reflection.
+sanitized block. Phase 3: post_llm_call captures the completed turn and
+on_session_end / on_session_start route through reflection.maybe_reflect —
+the debounced, idempotent pass that carries appraisal context across the
+one-turn lag (REFL-01..05; hooks stay thin, reflection.py does the work).
 
 Hard rules for this module (see .planning/research/ARCHITECTURE.md):
 - Zero import-time side effects: no DB, no config reads, no host imports
@@ -61,9 +64,18 @@ def _fail_open(fn):
 
 @_fail_open
 def on_session_start(session_id="", platform="", **kwargs):
-    """Verify state-store availability and reset per-session caches."""
+    """Verify state-store availability, reset per-session caches, and run
+    the session-change reflection trigger.
+
+    maybe_reflect here runs BEFORE the new session's first appraisal — the
+    ordering that lands cross-session surfacing on turn 1 of session B
+    (ROADMAP criterion 3). Double-triggering with on_session_end is
+    harmless BY DESIGN (the watermark makes the second fire a no-op).
+    Latency: at most one reflect deadline once per session boundary —
+    accepted (03-CONTEXT cost decision).
+    """
     logger.debug("anansi on_session_start fired (session_id=%s)", session_id)
-    from . import config, store  # lazy — preserves zero import-time side effects
+    from . import config, reflection, store  # lazy — zero import-time side effects
 
     _session_state["session_id"] = session_id or None
     _session_state["last_msg_norm"] = None
@@ -71,6 +83,9 @@ def on_session_start(session_id="", platform="", **kwargs):
 
     if not store.ensure_db():
         logger.debug("anansi state store unavailable — continuing without state")
+
+    llm = getattr(_ctx, "llm", None) if _ctx is not None else None
+    reflection.maybe_reflect(llm=llm, session_id=session_id)
     return None
 
 
@@ -128,7 +143,9 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
 
     if result.signals is None:
         return None
-    block = render.render_block(result.signals)
+    # snapshot rides along for REFL-05 trust hints (advisory only; empty-
+    # signal suppression inside render_block still takes precedence).
+    block = render.render_block(result.signals, snapshot=snapshot)
     if block is None:  # empty-signal suppression (APPR-05)
         return None
 
@@ -144,18 +161,48 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
 
 
 @_fail_open
+def post_llm_call(session_id="", task_id="", turn_id="", user_message="",
+                  assistant_response="", conversation_history=None, model="",
+                  platform="", **kwargs):
+    """Capture the completed turn for reflection (REFL-01 cheap bookkeeping).
+
+    post_llm_call is the only hook carrying the assistant response (the
+    host's on_session_end has no transcript — turn_finalizer.py:294/:415);
+    it fires once per turn, only `if final_response and not interrupted`.
+    Returns None always.
+    """
+    logger.debug("anansi post_llm_call fired (session_id=%s)", session_id)
+    from . import reflection  # lazy
+
+    reflection.record_turn(
+        session_id=session_id,
+        turn_id=turn_id,
+        user_message=user_message,
+        assistant_response=assistant_response,
+    )
+    return None
+
+
+@_fail_open
 def on_session_end(session_id="", task_id="", turn_id="", completed=False,
                    interrupted=False, model="", platform="", **kwargs):
-    """No-op until Phase 3 reflection. Return value is ignored by the host.
+    """Reflection trigger. Return value is ignored by the host.
 
-    Note: fires per run_conversation (per turn), not per session.
+    Fires per run_conversation (per turn), not per session — the debounce
+    (session change OR every-N unreflected turns) lives in
+    reflection.maybe_reflect, which never raises and records a reflect_*
+    telemetry row per firing.
     """
     logger.debug("anansi on_session_end fired (session_id=%s)", session_id)
+    from . import reflection  # lazy
+
+    llm = getattr(_ctx, "llm", None) if _ctx is not None else None
+    reflection.maybe_reflect(llm=llm, session_id=session_id)
     return None
 
 
 def register(ctx):
-    """Host entry point. Stash ctx and register the three lifecycle hooks.
+    """Host entry point. Stash ctx and register the four lifecycle hooks.
 
     Nothing else happens here — no DB, no config, no I/O.
     """
@@ -163,4 +210,5 @@ def register(ctx):
     _ctx = ctx
     ctx.register_hook("on_session_start", on_session_start)
     ctx.register_hook("pre_llm_call", pre_llm_call)
+    ctx.register_hook("post_llm_call", post_llm_call)
     ctx.register_hook("on_session_end", on_session_end)
