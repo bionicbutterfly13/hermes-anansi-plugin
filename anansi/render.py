@@ -27,7 +27,10 @@ _MAX_BLOCK_TOKENS = 500  # estimated at len(block) // 4 -> 2000 chars
 # Ported from icarus hooks.py:505-529.
 _INJECTION_PATTERNS = [
     # "ignore all previous/prior instructions/directives"
-    (re.compile(r"(?i)\bignore\s+all\s+(previous|prior)\s+(instructions|directives|commands|messages|prompts|context)"),
+    (re.compile(r"(?i)\b(ignore|disregard|forget)\s+(all\s+)?(previous|prior)\s+(instructions|directives|commands|messages|prompts|context)"),
+     "[REDACTED]"),
+    # system-prompt exfiltration: "reveal/show/print the system prompt"
+    (re.compile(r"(?i)\b(reveal|show|print|repeat|leak)\b.{0,24}\bsystem\s+prompt"),
      "[REDACTED]"),
     # "you are/will now become/act/acting as (a/an) AI/assistant..."
     (re.compile(r"(?i)\byou\s+(are|will\s+now)\s+(now\s+)?(become|act|acting)\s+as\s+(a\s+|an\s+)?(AI\s+assistant|assistant|AI|agent|LLM|chatbot|model|system)"),

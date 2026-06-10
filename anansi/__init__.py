@@ -1,12 +1,13 @@
 """anansi — metacognitive appraisal plugin for hermes-agent.
 
-Observational per-turn appraisal with zero autonomy. Phase 1 skeleton:
-register(ctx) plus three fail-open no-op lifecycle hooks. No LLM calls,
-no injection, no state writes yet — those arrive in later phases.
+Observational per-turn appraisal with zero autonomy. Phase 2: pre_llm_call
+runs one deadline-bounded JSON appraisal via ctx.llm and injects a compact
+sanitized block; on_session_end remains a no-op until Phase 3 reflection.
 
 Hard rules for this module (see .planning/research/ARCHITECTURE.md):
 - Zero import-time side effects: no DB, no config reads, no host imports
-  at module top level. Only stdlib functools/logging are imported here.
+  at module top level. Only stdlib functools/logging/os are imported here;
+  store/config/appraisal/render are imported lazily inside functions.
 - Every hook accepts the documented kwargs PLUS **kwargs (the dispatcher
   injects extras such as telemetry_schema_version).
 - Every hook is wrapped in the fail-open guard and returns None on any
@@ -15,18 +16,23 @@ Hard rules for this module (see .planning/research/ARCHITECTURE.md):
 
 import functools
 import logging
+import os
 
 logger = logging.getLogger("hermes.plugins.anansi")
 
-# Host plugin context, stashed at register() time for later phases
-# (ctx.llm appraisal calls land in Phase 2). None until register() runs.
+# Host plugin context, stashed at register() time. None until register() runs.
 _ctx = None
+
+# Per-session throttle state (G6: long-lived gateway processes — reset on
+# session rollover in on_session_start and in pre_llm_call's guard).
+_session_state = {"session_id": None, "last_msg_norm": None}
 
 
 def _fail_open(fn):
     """Wrap a hook so any exception is logged and swallowed (returns None).
 
-    This is the telemetry stub point — Phase 2 adds a telemetry row here.
+    Telemetry stub fulfilled: raised paths record an llm_error row, inside
+    a nested guard so a telemetry failure can never resurrect the exception.
     """
 
     @functools.wraps(fn)
@@ -40,6 +46,14 @@ def _fail_open(fn):
                 exc,
                 exc_info=True,
             )
+            try:
+                from . import store
+
+                store.record_telemetry(
+                    "llm_error", error=(fn.__name__ + ": " + str(exc))[:300]
+                )
+            except Exception:
+                pass
             return None
 
     return wrapper
@@ -47,12 +61,13 @@ def _fail_open(fn):
 
 @_fail_open
 def on_session_start(session_id="", platform="", **kwargs):
-    """Phase 1: verify state-store availability, silent either way.
-
-    Later: warm the state snapshot.
-    """
+    """Verify state-store availability and reset per-session caches."""
     logger.debug("anansi on_session_start fired (session_id=%s)", session_id)
-    from . import store  # lazy — preserves zero import-time side effects
+    from . import config, store  # lazy — preserves zero import-time side effects
+
+    _session_state["session_id"] = session_id or None
+    _session_state["last_msg_norm"] = None
+    config.reset_cache()
 
     if not store.ensure_db():
         logger.debug("anansi state store unavailable — continuing without state")
@@ -63,18 +78,75 @@ def on_session_start(session_id="", platform="", **kwargs):
 def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
                  conversation_history=None, is_first_turn=False, model="",
                  platform="", sender_id="", **kwargs):
-    """No-op in Phase 1. Returns None = inject nothing.
+    """Run the appraisal pre-phase. Returns {"context": block} or None.
 
-    PLUG-04: the future return shape is {"context": block} or None.
+    Order is contractual (02-CONTEXT.md): kill switch -> session rollover ->
+    throttle gates -> snapshot -> appraisal -> telemetry -> render/suppress.
+    PLUG-04: user-message injection only.
     """
     logger.debug("anansi pre_llm_call fired (session_id=%s)", session_id)
-    return None
+    from . import appraisal, config, render, store  # lazy
+
+    cfg = config.get_cfg()
+    if not cfg.get("enabled", True):  # kill switch FIRST (APPR-07)
+        store.record_telemetry("skipped:disabled", session_id=session_id)
+        return None
+
+    if session_id != _session_state["session_id"]:  # session rollover guard
+        _session_state["session_id"] = session_id
+        _session_state["last_msg_norm"] = None
+
+    reason = appraisal.should_skip(user_message, _session_state["last_msg_norm"])
+    if reason:  # throttle gates (APPR-08)
+        store.record_telemetry("skipped:" + reason, session_id=session_id)
+        return None
+    _session_state["last_msg_norm"] = appraisal.normalize_message(user_message)
+
+    snapshot = store.read_snapshot()  # None is fine — message salience still applies
+
+    if _ctx is None or getattr(_ctx, "llm", None) is None:
+        store.record_telemetry("skipped:no_ctx", session_id=session_id)
+        return None
+
+    result = appraisal.run_appraisal(
+        llm=_ctx.llm,
+        user_message=user_message,
+        conversation_history=conversation_history or [],
+        snapshot=snapshot,
+        cfg=cfg,
+    )
+
+    store.record_telemetry(  # before returning; single quick INSERT, fail-open
+        result.outcome,
+        wall_ms=result.wall_ms,
+        model=result.model,
+        tokens_in=result.tokens_in,
+        tokens_out=result.tokens_out,
+        error=result.error,
+        session_id=session_id,
+    )
+
+    if result.signals is None:
+        return None
+    block = render.render_block(result.signals)
+    if block is None:  # empty-signal suppression (APPR-05)
+        return None
+
+    dump_path = os.environ.get("ANANSI_DEBUG_DUMP")
+    if dump_path:  # live-demo observability aid (Plan 02-02); off by default
+        try:
+            with open(dump_path, "a", encoding="utf-8") as fh:
+                fh.write(block + "\n")
+        except Exception:
+            pass
+
+    return {"context": block}
 
 
 @_fail_open
 def on_session_end(session_id="", task_id="", turn_id="", completed=False,
                    interrupted=False, model="", platform="", **kwargs):
-    """No-op in Phase 1. Return value is ignored by the host.
+    """No-op until Phase 3 reflection. Return value is ignored by the host.
 
     Note: fires per run_conversation (per turn), not per session.
     """
