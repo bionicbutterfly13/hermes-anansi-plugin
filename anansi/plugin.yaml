@@ -1,0 +1,10 @@
+name: anansi
+version: 0.1.0
+description: Metacognitive appraisal plugin — observational per-turn appraisal with zero autonomy. Phase 1 skeleton (inert hooks + state store).
+author: Dr. Mani Saint-Victor
+kind: standalone
+provides_hooks:
+  - on_session_start
+  - pre_llm_call
+  - on_session_end
+pip_dependencies: []
