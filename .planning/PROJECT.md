@@ -24,8 +24,8 @@ turn reliability (strict fail-open).
 
 - [ ] Plugin loads via hermes-agent's standard plugin mechanism (`plugin.yaml`, hook functions) with no vendored-code edits
 - [ ] `pre_llm_call` hook runs the appraisal: fast JSON-mode LLM call over (user message + raw conversation history + local SQLite appraisal state), output parsed into a compact block (≤ ~500 tokens) returned as `{"context": block}` (injected into the user message — host invariant)
-  — **AMENDED by research 2026-06-10:** the hook fires BEFORE memory prefetch (verified turn_context.py:316 vs :359-374), so the appraisal cannot see the current turn's Hindsight-injected memory; memory-derived signals come from state accumulated by prior reflection passes (deliberate one-turn lag). ⚠ Needs Dr. Mani acknowledgment.
-- [ ] Appraisal is strictly fail-open: any error/timeout (LLM down, state corrupt) yields empty injection, never a crashed or blocked turn; hard timeout ≈ 2-3s
+  — **AMENDED by research 2026-06-10:** the hook fires BEFORE memory prefetch (verified turn_context.py:316 vs :359-374), so the appraisal cannot see the current turn's Hindsight-injected memory; memory-derived signals come from state accumulated by prior reflection passes (deliberate one-turn lag). ✓ Accepted by Dr. Mani 2026-06-10 ("drop the ack issue"); reflection (Phase 3) is the carrier of appraisal context across the lag.
+- [ ] Appraisal is strictly fail-open: any error/timeout (LLM down, state corrupt) yields empty injection, never a crashed or blocked turn; configurable hard deadline, default 8.0s, p50 target ≤6s *(revised 2026-06-10 R1 — Dr. Mani accepted ~5s p50 / max quality; haiku appraisal is generation-bound 4.4–7.3s)*
 - [ ] Local appraisal state (lightweight affect summary, active-concern list, contradiction log, confidence/trust scores) persisted in SQLite under `$HERMES_HOME` — no Postgres, no stored procedures, no new daemons
 - [ ] `on_session_end` hook runs the reflection pass: updates appraisal state from the session transcript (observations applied locally — the Anansi "apply_subconscious_observations" equivalent, reimplemented on SQLite)
   — **AMENDED by research 2026-06-10:** `on_session_end` fires per turn, not per session (turn_finalizer.py:410-411); cheap bookkeeping every firing, LLM reflection only on session-change or N-turn debounce, idempotent single WAL transaction.
@@ -78,7 +78,7 @@ turn reliability (strict fail-open).
 | Confidence/trust scoring replaces dopamine modulation | Same signal value, none of the drive mechanics | — Pending |
 | `pre_llm_call` + `on_session_end` (+ `on_session_start` state load) | Proven icarus hook surface | — Pending |
 | Develop standalone repo first, PR in-tree later | Mirrors neo4j/self-evolution repo pattern; PR needs sign-off | — Pending |
-| Appraisal inputs = message + history + SQLite state (one-turn memory lag) | pre_llm_call fires before memory prefetch — current-turn memory unreachable (research, verified) | ⚠ Needs Dr. Mani ack |
+| Appraisal inputs = message + history + SQLite state (one-turn memory lag) | pre_llm_call fires before memory prefetch — current-turn memory unreachable (research, verified) | ✓ Accepted 2026-06-10 |
 | Reflection debounced (session-change or N turns), idempotent | on_session_end fires per turn; un-debounced reflection doubles per-turn cost | — Pending |
 | Zero new pip dependencies | Host provides ctx.llm.complete_structured + stdlib sqlite3; strongest upstream-PR posture | — Pending |
 | Confidence advisory-only, schema noun-fields-only, sanitized rendering | 2026 calibration research: verbalized confidence too noisy to gate on; injection-surface defense | — Pending |

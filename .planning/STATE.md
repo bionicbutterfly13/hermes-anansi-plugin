@@ -34,7 +34,7 @@ Progress: [████░░░░░░] 38%
 
 | Decision | Phase | Rationale |
 |----------|-------|-----------|
-| Appraisal inputs = message + history + SQLite state (one-turn memory lag) | pre-1 | pre_llm_call fires before memory prefetch — ⚠ needs Dr. Mani ack |
+| Appraisal inputs = message + history + SQLite state (one-turn memory lag) | pre-1 | pre_llm_call fires before memory prefetch — ✓ accepted by Dr. Mani 2026-06-10 |
 | Reflection debounced + idempotent | pre-1 | on_session_end fires per turn |
 | Zero new pip dependencies | pre-1 | Host surfaces + stdlib suffice; best PR posture |
 | Confidence advisory-only; noun-fields-only schema; sanitized rendering | pre-1 | Calibration noise + injection-surface defense |
@@ -48,8 +48,8 @@ Progress: [████░░░░░░] 38%
 
 ## Blockers / Concerns
 
-- ⚠ PROJECT.md amendment (reduced appraisal inputs / one-turn lag) awaits Dr. Mani acknowledgment
-- ⚠ p50 appraisal wall time 5501ms vs ≤1.0s ROADMAP target — Phase-3 decision needed (terser prompt/schema, lower max_tokens, faster lane, or revised target)
+- ~~One-turn-lag ack~~ RESOLVED 2026-06-10: accepted by Dr. Mani; reflection carries appraisal context across the lag (R2)
+- ~~p50 5501ms vs ≤1.0s target~~ RESOLVED 2026-06-10: target revised to p50 ≤6s / 8.0s deadline, max quality (R1, Dr. Mani decision)
 - Upstream-main parity of ctx.llm facade + manifest keys must be re-verified before Phase 4 PR
 
 ## Session Continuity

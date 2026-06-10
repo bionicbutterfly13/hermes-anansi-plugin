@@ -29,13 +29,13 @@ quality). Feature IDs (T*/D*) reference `.planning/research/FEATURES.md`.
 - [ ] **APPR-03** Per-signal confidence threshold (default 0.6); signals below threshold dropped (T5)
 - [ ] **APPR-04** Compact rendered block ≤500 tokens, top-3 per category, sentinel prefix (`[anansi appraisal]`), sanitized through icarus-style `_validate_safe_content` pipeline (T2)
 - [ ] **APPR-05** Empty-signal suppression: nothing salient → inject nothing (T4)
-- [ ] **APPR-06** Appraisal model separately configurable (cheap tier); on `PluginLlmTrustError` retry once with host's active model, then fail open (T6; SUMMARY Key Decision 3)
+- [ ] **APPR-06** Appraisal model separately configurable (cheap tier); on `PluginLlmTrustError` retry once with host's active model, then fail open (T6; SUMMARY Key Decision 3) — *annotation 2026-06-10 (R3): mechanism unit-proven; unproducible live on this install (host fallback ~37s exceeds the deadline clamp, degrades to the designed fail-open timeout); correct for installs with faster host models*
 - [ ] **APPR-07** Config kill switch disables the pre-phase entirely (T7)
 - [ ] **APPR-08** Throttle gates: skip appraisal on social closers / near-duplicate turns (icarus precedent)
 
 ### SAFE — Fail-open + anti-creep (T3)
 
-- [ ] **SAFE-01** Hard wall-clock deadline 2.5–3.0s on the appraisal call (executor-based; per-call socket timeouts don't bound wall time); zero retries beyond the trust-gate fallback
+- [ ] **SAFE-01** Configurable executor-bounded wall-clock deadline on the appraisal call, default 8.0s (per-call socket timeouts don't bound wall time); p50 target ≤6s; zero retries beyond the trust-gate fallback — *revised 2026-06-10 (R1): Dr. Mani accepted ~5s p50 / max quality; live haiku appraisal is generation-bound at 4.4–7.3s, so the original 2.5–3.0s spec times out 100%*
 - [ ] **SAFE-02** Fail-open test matrix: LLM timeout, trust rejection, malformed JSON, truncation, `content: null`, locked/corrupt/absent DB, missing config — every case asserts no-raise + empty injection + normal turn
 - [ ] **SAFE-03** Unit test asserts no imperative/directive language patterns in any rendered block (anti: hidden second policy layer)
 - [ ] **SAFE-04** Plugin never executes tools/searches, never writes to the memory provider, never gates/delays a turn, never modifies its own prompt/config from reflection (locked anti-features)
@@ -43,7 +43,7 @@ quality). Feature IDs (T*/D*) reference `.planning/research/FEATURES.md`.
 ### REFL — Session-end reflection (T9, shallow D1/D2)
 
 - [ ] **REFL-01** `on_session_end`: cheap bookkeeping (turn_log append) every firing; LLM reflection pass only on session-id change or N-turn debounce, applied in one idempotent WAL transaction (amended: hook fires per turn)
-- [ ] **REFL-02** Reflection extracts observations → bounded conservative deltas to affect summary, concerns, contradiction log, trust scores (the `apply_subconscious_observations` equivalent on SQLite)
+- [ ] **REFL-02** Reflection extracts observations → bounded conservative deltas to affect summary, concerns, contradiction log, trust scores (the `apply_subconscious_observations` equivalent on SQLite) — *sharpened 2026-06-10 (R2): reflection is the carrier of appraisal context across the one-turn lag — the second half of the appraisal input contract. Inputs are user messages + assistant response text + state; NOT the injected memory block (ephemeral, never persisted to the transcript — verified conversation_loop.py:610-627)*
 - [ ] **REFL-03** Reflection inputs exclude sentinel-prefixed appraisal blocks (anti echo-chamber)
 - [ ] **REFL-04** Contradiction signals (semantic/narrative/relational/emotional) persisted and re-surfaced when relevant — shallow v1, validated against a fixture set before deepening (D1)
 - [ ] **REFL-05** Confidence/trust scores surfaced as advisory hints ("low confidence on X") — never a gate (D2)
@@ -76,4 +76,4 @@ quality). Feature IDs (T*/D*) reference `.planning/research/FEATURES.md`.
 | Postgres/AGE/RabbitMQ/Ollama/UI | Original Anansi infra; this plugin is SQLite-only, Docker-free |
 
 ---
-*Last updated: 2026-06-10 — PLUG-01..04 + STATE-01..05 delivered by Phase 1 (see 01-VERIFICATION.md)*
+*Last updated: 2026-06-10 — PLUG-01..04 + STATE-01..05 delivered by Phase 1 (see 01-VERIFICATION.md); R1/R2/R3 revisions applied from MEMORY-STACK-ANALYSIS-2026-06-10.md §6 (Dr. Mani-accepted decisions)*

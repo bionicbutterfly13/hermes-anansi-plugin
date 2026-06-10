@@ -3,7 +3,7 @@
 Created 2026-06-10 (autonomous ceremony). 4 coarse phases per SUMMARY.md's roadmap implications;
 ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to exactly one phase.
 
-## Phase 1 — Skeleton + State (no LLM) — ✓ Complete 2026-06-10 (verification: human_needed, 16/17, one cosmetic network-blocked re-run)
+## Phase 1 — Skeleton + State (no LLM) — ✓ Complete 2026-06-10 (verification: passed, 17/17 — network-blocked item closed same day)
 
 **Goal:** A loadable, inert, state-capable plugin — proven against the live install.
 
@@ -23,14 +23,14 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 
 **Success criteria:**
 1. A real `hermes` turn shows a `[anansi appraisal]` block with instincts/salience signals grounded in the actual message + state
-2. Telemetry shows p50 ≤1.0s appraisal wall time, one LLM call per eligible turn, outcome distribution visible
+2. Telemetry shows p50 ≤6s appraisal wall time within the 8.0s default deadline, one LLM call per eligible turn, outcome distribution visible *(revised 2026-06-10 R1 — original ≤1.0s; Dr. Mani accepted ~5s p50 / max quality)*
 3. Kill switch off → zero appraisal calls; trust-gate denial → automatic fallback to host model (verified)
 4. Quiet/duplicate turns inject nothing (suppression + throttle verified)
 5. Phase-0 items 5–7 (model quirks, contradiction fixture quality, telemetry) recorded
 
 ## Phase 3 — Fail-Open Hardening + Reflection
 
-**Goal:** Nothing the plugin does can hurt a turn; state actually learns across sessions.
+**Goal:** Nothing the plugin does can hurt a turn; reflection becomes the carrier of appraisal context across the one-turn lag — the second half of the appraisal input contract, not polish. State actually learns across sessions. *(Sharpened 2026-06-10 R2; reflection inputs = messages + assistant responses + state, never the ephemeral injected memory block.)*
 
 **Requirements:** SAFE-01, SAFE-02, SAFE-03, SAFE-04, REFL-01, REFL-02, REFL-03, REFL-04, REFL-05
 

@@ -19,3 +19,22 @@ Dr. Mani may rename later (cost: dir + plugin.yaml name + enable key + docs swee
 
 **Consequence:** all Phase-1+ docs/plans swept for the rename; executor re-run from scratch
 (no commits had landed). The guardrails plugin was left untouched and verified still enabled.
+
+## 2026-06-10 — R1–R3 roadmap revisions (from MEMORY-STACK-ANALYSIS-2026-06-10.md §6, Dr. Mani-accepted)
+
+**R1 — SAFE-01 latency.** Original spec: hard deadline 2.5–3.0s. Live evidence (02-VALIDATION.md):
+haiku appraisal is generation-bound at 4.4–7.3s; 2.5s times out 100%. Dr. Mani's decision
+(2026-06-10): accept ~5s p50, max quality. New spec: configurable executor-bounded deadline,
+**default 8.0s; p50 target ≤6s; zero retries** beyond trust-gate fallback. Accepted trade-off:
+~5s serial pre-phase tax per eligible turn (suppression/throttle gates keep ineligible turns free).
+
+**R2 — Reflection is the cross-lag carrier.** The one-turn memory lag (pre_llm_call fires before
+memory prefetch) was accepted by Dr. Mani 2026-06-10 ("drop the ack issue"). Consequence:
+Phase-3 reflection is not polish — it is the second half of the appraisal input contract, the
+only channel by which memory-influenced context reaches future appraisals. Reflection inputs are
+user messages + assistant response text + SQLite state; **never** the injected memory block,
+which is ephemeral (appended at API-call time only, never persisted — conversation_loop.py:610-627).
+
+**R3 — APPR-06 trust fallback: annotated, unchanged.** Mechanism unit-proven; unproducible live
+here (host model ~37s/appraisal exceeds the deadline clamp → degrades to designed fail-open
+timeout). Correct behavior for installs with faster host models. No code change.
