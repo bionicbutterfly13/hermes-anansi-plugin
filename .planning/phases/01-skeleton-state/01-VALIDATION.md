@@ -195,3 +195,13 @@ consistent regression from the no-op hooks. ROADMAP success criterion 2 (output
 AND latency unchanged) is satisfied for the skeleton.
 
 After the comparison the plugin was re-enabled (`✓ Plugin anansi enabled`).
+
+## Store live verification
+
+- `$HERMES_HOME/anansi/state.db` was created at 05:57 through the production path: `on_session_start` → lazy `store.ensure_db()` during a real `hermes -z` session (executor's live-wiring run). Not created by tests (the suite's no-pollution check passed against the real home).
+- Read-only URI check (2026-06-10 ~07:0x): `journal_mode: wal`; tables = `affect_summary, concerns, contradictions, meta, trust_scores, turn_log` — all six present.
+- Post-wiring test suite: **10 passed** (round-trip, degradation matrix absent/corrupt/mismatch/locked, caps 20/50/500/64). Landmine grep clean.
+- **Deviation (network outage):** at verification time every outbound HTTPS call from this machine failed (`curl` → `000`/TLS error 35 for api.anthropic.com, api.openai.com, api.github.com), so a freshly *completed* turn could not be captured — API calls failed after retries on both anthropic and openai-api lanes. The plugin's behavior during the outage is itself evidence: manifest parsed, 3 hooks registered, zero `[anansi` output, zero tracebacks while the host's own API calls failed. Combined with Item 4b's completed-turn proof (output exactly `OK`, latency parity) the phase demo is covered. **Follow-up for Dr. Mani:** when the network recovers, one clean `HERMES_PLUGINS_DEBUG=1 hermes -z "Reply with exactly: OK"` should complete normally — nothing in the plugin path depends on it, but it closes the loop cosmetically.
+- Side observation for the upstream-candidates list: `hermes -z` exits **0** even when "API call failed after 3 retries" — a failed turn is indistinguishable from success by exit code.
+
+Phase 1 success criteria: 1–3 are evidenced in this file; criterion 4 is evidenced with Item 3 **answered** (upstream/main 183d86b3e has `provides_hooks` + `ctx.llm` parity — not deferred).

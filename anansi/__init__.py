@@ -47,8 +47,15 @@ def _fail_open(fn):
 
 @_fail_open
 def on_session_start(session_id="", platform="", **kwargs):
-    """No-op in Phase 1. Later: warm the state snapshot."""
+    """Phase 1: verify state-store availability, silent either way.
+
+    Later: warm the state snapshot.
+    """
     logger.debug("anansi on_session_start fired (session_id=%s)", session_id)
+    from . import store  # lazy — preserves zero import-time side effects
+
+    if not store.ensure_db():
+        logger.debug("anansi state store unavailable — continuing without state")
     return None
 
 
