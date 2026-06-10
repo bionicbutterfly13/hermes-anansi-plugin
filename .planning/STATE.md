@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-06-10)
 ## Current Position
 
 Phase: 3 of 4 (Fail-Open Hardening + Reflection)
-Plan: not yet planned
-Status: Phase 2 VERIFIED PASSED (12/12 must-haves, 49/49 tests, p50 5715ms ≤6s revised target) — Phase 3 planning next
-Last activity: 2026-06-10 — R1-R3 roadmap revisions applied (53cdf9d); Phase-2 verification passed (02-VERIFICATION.md, c038e93); APPR-01..08 + OBS-01 checked off
+Plan: 03-01 COMPLETE (1 of 3) — 03-02 (reflection engine) next
+Status: Plan 03-01 executed — SAFE-01 default aligned (8.0s), SAFE-02 non-reflection matrix green, SAFE-03 corpus + SAFE-04 static scans green; suite 49 → 68 via ./scripts/test.sh
+Last activity: 2026-06-10 — Plan 03-01 complete (e846443, 7186ecd, ad7871e): repo-local test idiom (scripts/test.sh + .devtools staging), fail-open matrix, anti-creep proofs
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 58%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 5
 - Average duration: ~1 session
-- Total execution time: ~4 hours
+- Total execution time: ~5 hours
 
 **By Phase:**
 
@@ -29,6 +29,7 @@ Progress: [█████░░░░░] 50%
 |-------|-------|-------|----------|
 | 1 — Skeleton + State | 2/2 | ~2h | ~1h |
 | 2 — Appraisal Path | 2/2 | ~2h | ~1h |
+| 3 — Fail-Open + Reflection | 1/3 | ~1h | ~1h |
 
 ## Accumulated Decisions
 
@@ -45,6 +46,9 @@ Progress: [█████░░░░░] 50%
 | Live lane: anthropic claude-haiku-4-5; deadline_seconds 8.0 (not 2.5) | 2 | Empirical: haiku appraisal is 4.4–7.3s generation-bound; 2.5s times out 100% |
 | Contradiction kind labels advisory-only (never branch on exact kind) | 2 | Fixtures: 6/6 detection, 0/3 FP, but semantic/narrative over-applied, relational mislabeled |
 | Trust-denied config degrades to fail-open timeout on this install (not trust_fallback) | 2 | Host model sonnet-4-6 needs ~37s/appraisal > 10s deadline clamp; mechanism unit-proven |
+| WAL `BEGIN EXCLUSIVE` never blocks readers (== IMMEDIATE); reader-blocking lock tests need a rollback-journal tmp DB | 3 | Verified empirically 2026-06-10; locked-DB matrix rows assert both truths (test_failopen_matrix.py) |
+| Bare second-person directive payload text quoted as reported material by render._sanitize_text (SAFE-03) | 3 | "you should migrate now" rendered structurally directive; quoting keeps the line observational |
+| Dev tooling staged repo-locally (.devtools/pytest via uv --target); hermes venv never modified | 3 | uv-sync wipe risk locked in 03-CONTEXT; ./scripts/test.sh is the canonical test command |
 
 ## Blockers / Concerns
 
@@ -55,4 +59,4 @@ Progress: [█████░░░░░] 50%
 ## Session Continuity
 
 Last session: 2026-06-10 (autonomous)
-Stopped at: Plan 02-02 complete (live validation evidenced in 02-VALIDATION.md, zero pending-network items); next step verify-work for Phase 2
+Stopped at: Plan 03-01 complete (SUMMARY written, suite 68 green via ./scripts/test.sh); next step execute 03-02 (reflection engine)
