@@ -8,7 +8,10 @@ Contract (see .planning/phases/01-skeleton-state/01-CONTEXT.md, all locked):
 - PRAGMAs: journal_mode=WAL (persistent, set at creation), synchronous=NORMAL
   and busy_timeout on every write connection. Hot-path reads open read-only
   URI connections (file:<path>?mode=ro) and never create files.
-- Single write funnel: ALL writes go through apply_deltas() in one transaction.
+- Write funnels: ALL state-table writes go through apply_deltas() in one
+  transaction. Telemetry writes go through record_telemetry() — the only
+  other write path, a single quick INSERT + cap eviction designed to be
+  hot-path safe (OBS-01).
 - Disposable-state doctrine: ANY structural problem (corruption, schema_version
   mismatch, missing table, failed open) -> quarantine + recreate fresh. No
   migration framework.
@@ -20,12 +23,13 @@ import json
 import logging
 import os
 import sqlite3
+import statistics
 from datetime import datetime, timezone
 from pathlib import Path
 
 logger = logging.getLogger("hermes.plugins.anansi.store")
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Per-table row caps (seed values; tune later with telemetry).
 CAPS = {
@@ -33,6 +37,7 @@ CAPS = {
     "contradictions": 50,
     "turn_log": 500,
     "trust_scores": 64,
+    "telemetry": 2000,
 }
 
 _DEFAULT_BUSY_TIMEOUT_MS = 5000
@@ -44,6 +49,7 @@ _TABLES = (
     "contradictions",
     "trust_scores",
     "turn_log",
+    "telemetry",
 )
 
 # Caps/decay columns (expires_at, decayed_weight) are in the schema NOW even
@@ -63,6 +69,12 @@ _SCHEMA_DDL = (
     """CREATE TABLE trust_scores    (key TEXT PRIMARY KEY, value REAL NOT NULL, updated_at TEXT)""",
     """CREATE TABLE turn_log        (id INTEGER PRIMARY KEY, session_id TEXT, turn_id TEXT,
                                      user_excerpt TEXT, appraisal_json TEXT, created_at TEXT)""",
+    # Schema v2 (OBS-01): per-appraisal-call telemetry. Existing v1 DBs fail
+    # _verify_structure (version mismatch + missing table) and are
+    # quarantine-recreated — disposable-state doctrine, no migration code.
+    """CREATE TABLE telemetry       (id INTEGER PRIMARY KEY, ts TEXT NOT NULL, session_id TEXT,
+                                     wall_ms INTEGER, model TEXT, tokens_in INTEGER,
+                                     tokens_out INTEGER, outcome TEXT NOT NULL, error TEXT)""",
 )
 
 
@@ -371,6 +383,122 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms: int = 5000) -> boo
         logger.warning("anansi apply_deltas failed (degrading): %s", exc)
         logger.debug("apply_deltas failure detail", exc_info=True)
         return False
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def record_telemetry(outcome, *, wall_ms=None, model=None, tokens_in=None,
+                     tokens_out=None, error=None, session_id=None,
+                     db_path=None) -> bool:
+    """Record one per-appraisal-call telemetry row (OBS-01).
+
+    The only write path besides apply_deltas(): a single quick INSERT plus
+    cap eviction in one transaction — hot-path safe by design. `outcome` is
+    one of ok|timeout|parse_fail|llm_error|trust_fallback|skipped:<reason>
+    (free-form after `skipped:`). `error` is truncated to 300 chars.
+    Never raises; returns False on any failure (fail open, warning log only).
+    """
+    conn = None
+    try:
+        path = Path(db_path) if db_path is not None else get_db_path()
+        if error is not None:
+            error = str(error)[:300]
+        conn = sqlite3.connect(str(path))
+        conn.execute("PRAGMA busy_timeout=%d" % _DEFAULT_BUSY_TIMEOUT_MS)
+        conn.execute("PRAGMA synchronous=NORMAL")
+        with conn:  # one transaction: INSERT + cap eviction
+            conn.execute(
+                "INSERT INTO telemetry"
+                " (ts, session_id, wall_ms, model, tokens_in, tokens_out,"
+                " outcome, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    _utc_now_iso(),
+                    session_id,
+                    wall_ms,
+                    model,
+                    tokens_in,
+                    tokens_out,
+                    str(outcome),
+                    error,
+                ),
+            )
+            conn.execute(
+                "DELETE FROM telemetry WHERE id NOT IN"
+                " (SELECT id FROM telemetry ORDER BY id DESC LIMIT ?)",
+                (CAPS["telemetry"],),
+            )
+        return True
+    except Exception as exc:
+        logger.warning("anansi record_telemetry failed (degrading): %s", exc)
+        logger.debug("record_telemetry failure detail", exc_info=True)
+        return False
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def telemetry_summary(db_path=None):
+    """Derived OBS-01 view: failure counter + last error, by query.
+
+    Read-only URI connection — never creates files. Returns
+    {"total", "by_outcome", "failure_count", "last_error", "p50_wall_ms"}
+    where failure_count counts everything not ok/trust_fallback/skipped:*,
+    last_error is the error of the newest failure row (same definition —
+    skipped/trust_fallback rows carry no error and are not failures), and
+    p50_wall_ms is the median wall_ms over ok/trust_fallback rows.
+    Returns None on any error. Never raises.
+    """
+    conn = None
+    try:
+        path = Path(db_path) if db_path is not None else get_db_path()
+        conn = sqlite3.connect("file:%s?mode=ro" % path, uri=True)
+        by_outcome = {
+            outcome: count
+            for outcome, count in conn.execute(
+                "SELECT outcome, COUNT(*) FROM telemetry GROUP BY outcome"
+            )
+        }
+        total = sum(by_outcome.values())
+        failure_count = sum(
+            count
+            for outcome, count in by_outcome.items()
+            if outcome not in ("ok", "trust_fallback")
+            and not outcome.startswith("skipped:")
+        )
+        row = conn.execute(
+            "SELECT error FROM telemetry"
+            " WHERE outcome NOT IN ('ok', 'trust_fallback')"
+            " AND outcome NOT LIKE 'skipped:%'"
+            " ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        last_error = row[0] if row is not None else None
+        wall_values = [
+            r[0]
+            for r in conn.execute(
+                "SELECT wall_ms FROM telemetry"
+                " WHERE outcome IN ('ok', 'trust_fallback')"
+                " AND wall_ms IS NOT NULL"
+            )
+        ]
+        p50 = int(statistics.median(wall_values)) if wall_values else None
+        return {
+            "total": total,
+            "by_outcome": by_outcome,
+            "failure_count": failure_count,
+            "last_error": last_error,
+            "p50_wall_ms": p50,
+        }
+    except Exception as exc:
+        logger.warning("anansi telemetry_summary failed (degrading): %s", exc)
+        logger.debug("telemetry_summary failure detail", exc_info=True)
+        return None
     finally:
         if conn is not None:
             try:

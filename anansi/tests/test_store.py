@@ -42,7 +42,7 @@ def test_ensure_db_creates_schema(tmp_path):
         row = conn.execute(
             "SELECT value FROM meta WHERE key='schema_version'"
         ).fetchone()
-        assert row == ("1",)
+        assert row == (str(store.SCHEMA_VERSION),)
         assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
     finally:
         conn.close()
@@ -86,7 +86,7 @@ def test_round_trip_identical_signals(tmp_path):
 
     def check(snap):
         assert snap is not None
-        assert snap["schema_version"] == 1
+        assert snap["schema_version"] == store.SCHEMA_VERSION
         affect = snap["affect_summary"]
         assert affect["summary"] == "steady, curious"
         assert affect["valence"] == 0.25
@@ -127,7 +127,7 @@ def test_corrupt_db_quarantined(tmp_path):
     assert len(quarantined) == 1
     snap = store.read_snapshot(db)
     assert snap is not None
-    assert snap["schema_version"] == 1
+    assert snap["schema_version"] == store.SCHEMA_VERSION
 
 
 def test_schema_version_mismatch_quarantined(tmp_path):
@@ -143,7 +143,7 @@ def test_schema_version_mismatch_quarantined(tmp_path):
     assert len(_quarantine_files(tmp_path)) == 1
     snap = store.read_snapshot(db)
     assert snap is not None
-    assert snap["schema_version"] == 1
+    assert snap["schema_version"] == store.SCHEMA_VERSION
 
 
 def test_locked_db_write_degrades(tmp_path):
