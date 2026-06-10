@@ -74,12 +74,24 @@ def _validate_safe_content(text: str) -> str:
         return text
 
 
+# SAFE-03: bare second-person directive phrasing in a payload field would
+# make the rendered advisory line read as an instruction. Quoted spans are
+# reported material and acceptable; bare matches get the whole field quoted.
+_QUOTED_SPAN_RE = re.compile(r'"[^"]*"')
+_SECOND_PERSON_DIRECTIVE_RE = re.compile(
+    r"(?i)\byou (should|must|need to|have to|shall)\b"
+)
+
+
 def _sanitize_text(text, max_len) -> str:
-    """patterns -> validate -> whitespace-normalize -> truncate.
+    """patterns -> validate -> whitespace-normalize -> truncate -> rephrase.
 
     All whitespace (including newlines) collapses to single spaces because
-    every rendered field lives on a single block line. Fail-open: returns
-    the truncated original on error.
+    every rendered field lives on a single block line. Bare second-person
+    directive phrasing (outside double-quoted spans) wraps the whole field
+    in quotes — observational rephrasing: reported material, never an
+    instruction line (SAFE-03). Fail-open: returns the truncated original
+    on error.
     """
     if not text:
         return ""
@@ -89,7 +101,10 @@ def _sanitize_text(text, max_len) -> str:
             result = pattern.sub(replacement, result)
         result = _validate_safe_content(result)
         result = re.sub(r"\s+", " ", result)
-        return result.strip()[:max_len]
+        result = result.strip()[:max_len]
+        if _SECOND_PERSON_DIRECTIVE_RE.search(_QUOTED_SPAN_RE.sub(" ", result)):
+            result = '"%s"' % result.replace('"', "'")
+        return result
     except Exception:
         return str(text)[:max_len]
 
