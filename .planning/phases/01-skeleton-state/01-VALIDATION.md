@@ -12,11 +12,77 @@ plugin listing below as `anansi | enabled`, separate from our `anansi`.
 
 ## Item 1 — Gateway-lane dispatch
 
-(Filled by task 01-01-03.)
+**Answer: SYNC — the gateway lane dispatches hooks through the exact same
+synchronous call site as the CLI lane.** Determined by code read (conclusive; no
+live gateway test needed — route noted per plan).
+
+Evidence chain (live source at `~/.hermes/hermes-agent`, branch `local-desktop-fixes`):
+
+1. `pre_llm_call` has exactly ONE dispatch site in the whole codebase:
+   `agent/turn_context.py:316-341` (`grep -rn "invoke_hook\|pre_llm_call" agent/ hermes_cli/`
+   shows no other `pre_llm_call` dispatch; no `ainvoke_hook` or `async def invoke_hook`
+   exists anywhere).
+2. That site calls the module-level `hermes_cli.plugins.invoke_hook`
+   (`plugins.py:1715-1720`) → `PluginManager.invoke_hook` (`plugins.py:1574-1609`) —
+   synchronous, sequential, per-callback try/except.
+3. The gateway reaches it through the same machinery: `gateway/run.py:9849-9853`
+   wraps `agent.run_conversation(...)` in a sync closure, executed via
+   `await self._run_in_executor_with_context(run_sync)` (`gateway/run.py:9857`;
+   helper defined at `gateway/run.py:11305`). `run_conversation` is a plain `def`
+   (`agent/conversation_loop.py:371`) → `build_turn_context`
+   (`conversation_loop.py:407`, plain `def` at `turn_context.py:64`) → the Item-1
+   dispatch site above. The API-server lane is the same shape
+   (`gateway/run.py:14215`), and `gateway/platforms/feishu_comment.py:1349` states
+   it outright: "Run agent in a thread (run_conversation is synchronous)".
+
+**Consequence for Phase 2 (for Dr. Mani):** in BOTH lanes the hooks run
+synchronously — on the CLI main thread, or on a gateway executor worker thread
+(never on the asyncio event loop). The planned sync
+`ctx.llm.complete_structured` inside a `ThreadPoolExecutor` with
+`future.result(timeout=...)` is correct for both lanes; no async variant needed.
+A slow hook blocks only that turn's thread, not the gateway loop — but it still
+adds full latency to the turn, so the 2.5s/3.0s wall-clock deadline stands.
 
 ## Item 2 — Hook-raise behavior
 
-(Filled by task 01-01-03.)
+**Result: the dispatcher isolates a raising hook — the turn survives.** Run
+exactly once, then fully reverted.
+
+Method: removed `@_fail_open` from `pre_llm_call` and made it raise
+`RuntimeError("anansi hook-raise experiment")`, then ran one real turn:
+
+```
+$ HERMES_PLUGINS_DEBUG=1 hermes -z "Reply with exactly: OK"   # /tmp/anansi-raise-proof.txt
+OK        ← model output, exit 0, zero Traceback lines
+```
+
+The turn completed normally with the raising hook deployed (output exactly `OK`,
+exit code 0, no traceback, no error text reached the user).
+
+The dispatcher's WARNING line did not surface in the `-z` console capture or
+`logs/agent.log` — the host quiets turn-time logging in one-shot mode (agent.log
+stops at "Plugin discovery complete"; even routine turn INFO lines are absent).
+To capture the exact line, the same raising hook was driven through the REAL
+dispatcher (`PluginManager.invoke_hook`) in-process
+(`/tmp/anansi-raise-dispatcher-proof.txt`):
+
+```
+WARNING hermes_cli.plugins: Hook 'pre_llm_call' callback pre_llm_call raised: anansi hook-raise experiment
+RESULTS: []
+TURN_PATH_SURVIVED: invoke_hook returned normally despite the raise
+```
+
+This is the catch block at `hermes_cli/plugins.py:1598-1608` (per-callback
+try/except → `logger.warning(...)` → continue), backed by the outer guard at
+`agent/turn_context.py:340-341`.
+
+**Conclusion:** the dispatcher isolates raising hooks; we still never raise — the
+`_fail_open` guard stays, because relying on the dispatcher means WARNING noise
+and no graceful degradation. Revert verified:
+`grep "hook-raise experiment" anansi/__init__.py` → nothing;
+`git status --porcelain anansi/__init__.py` → clean (matches committed
+skeleton); a final clean turn (`/tmp/anansi-final-clean-turn.txt`) completed with
+output exactly `OK`, no `[anansi` text, no traceback.
 
 ## Item 3 — ctx.llm facade + manifest key on upstream main
 
