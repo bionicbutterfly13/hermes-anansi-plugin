@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-06-10)
 
 **Core value:** Every Hermes turn gets a grounded metacognitive appraisal injected before response generation — with zero capacity for autonomous action and zero impact on turn reliability.
-**Current focus:** Phase 2 — Appraisal Path (the core)
+**Current focus:** Phase 3 — Fail-Open Hardening + Reflection
 
 ## Current Position
 
-Phase: 2 of 4 (Appraisal Path)
-Plan: 2 of 2 complete in current phase (02-01 + 02-02 done)
-Status: Phase 2 execution complete — ready for verify-work
-Last activity: 2026-06-10 — Plan 02-02 complete (live validation: real-turn block, fixtures 6/6 detection 0 FP, kill switch/throttles verified, p50 5501ms honest miss vs 1.0s target); Phase-1 human-needed item also closed (01-VERIFICATION now passed 17/17)
+Phase: 3 of 4 (Fail-Open Hardening + Reflection)
+Plan: not yet planned
+Status: Phase 2 VERIFIED PASSED (12/12 must-haves, 49/49 tests, p50 5715ms ≤6s revised target) — Phase 3 planning next
+Last activity: 2026-06-10 — R1-R3 roadmap revisions applied (53cdf9d); Phase-2 verification passed (02-VERIFICATION.md, c038e93); APPR-01..08 + OBS-01 checked off
 
-Progress: [████░░░░░░] 38%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 

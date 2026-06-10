@@ -15,7 +15,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 3. State store round-trips all tables; corrupt-DB and locked-DB scenarios degrade silently (tests green)
 4. Phase-0 validation items 1–4 from SUMMARY.md answered and recorded
 
-## Phase 2 — Appraisal Path (the core)
+## Phase 2 — Appraisal Path (the core) — ✓ Complete 2026-06-10 (verification: passed, 12/12 must-haves, 49/49 tests; see 02-VERIFICATION.md)
 
 **Goal:** Every eligible turn gets a grounded, capped, sanitized appraisal block — within budget.
 

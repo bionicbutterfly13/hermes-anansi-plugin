@@ -24,14 +24,14 @@ quality). Feature IDs (T*/D*) reference `.planning/research/FEATURES.md`.
 
 ### APPR — Appraisal pre-phase (T1–T7, D4, D7)
 
-- [ ] **APPR-01** `pre_llm_call` runs ONE JSON-mode appraisal call via `ctx.llm.complete_structured` over (user_message + raw conversation_history + SQLite state) — NOT current-turn memory injection (amended input contract, one-turn lag) (T1)
-- [ ] **APPR-02** Observation-only prompt written fresh (not ported verbatim from Anansi `subconscious.md`); schema has noun fields only — instincts (typed vocabulary approach/avoid/caution/curiosity/protect with 0–1 intensity + reason — D7), salient observations, contradiction flags, confidence per signal, suggested memory searches (advisory text only — D4), gut reaction (≤200 chars)
-- [ ] **APPR-03** Per-signal confidence threshold (default 0.6); signals below threshold dropped (T5)
-- [ ] **APPR-04** Compact rendered block ≤500 tokens, top-3 per category, sentinel prefix (`[anansi appraisal]`), sanitized through icarus-style `_validate_safe_content` pipeline (T2)
-- [ ] **APPR-05** Empty-signal suppression: nothing salient → inject nothing (T4)
-- [ ] **APPR-06** Appraisal model separately configurable (cheap tier); on `PluginLlmTrustError` retry once with host's active model, then fail open (T6; SUMMARY Key Decision 3) — *annotation 2026-06-10 (R3): mechanism unit-proven; unproducible live on this install (host fallback ~37s exceeds the deadline clamp, degrades to the designed fail-open timeout); correct for installs with faster host models*
-- [ ] **APPR-07** Config kill switch disables the pre-phase entirely (T7)
-- [ ] **APPR-08** Throttle gates: skip appraisal on social closers / near-duplicate turns (icarus precedent)
+- [x] **APPR-01** `pre_llm_call` runs ONE JSON-mode appraisal call via `ctx.llm.complete_structured` over (user_message + raw conversation_history + SQLite state) — NOT current-turn memory injection (amended input contract, one-turn lag) (T1)
+- [x] **APPR-02** Observation-only prompt written fresh (not ported verbatim from Anansi `subconscious.md`); schema has noun fields only — instincts (typed vocabulary approach/avoid/caution/curiosity/protect with 0–1 intensity + reason — D7), salient observations, contradiction flags, confidence per signal, suggested memory searches (advisory text only — D4), gut reaction (≤200 chars)
+- [x] **APPR-03** Per-signal confidence threshold (default 0.6); signals below threshold dropped (T5)
+- [x] **APPR-04** Compact rendered block ≤500 tokens, top-3 per category, sentinel prefix (`[anansi appraisal]`), sanitized through icarus-style `_validate_safe_content` pipeline (T2)
+- [x] **APPR-05** Empty-signal suppression: nothing salient → inject nothing (T4)
+- [x] **APPR-06** Appraisal model separately configurable (cheap tier); on `PluginLlmTrustError` retry once with host's active model, then fail open (T6; SUMMARY Key Decision 3) — *annotation 2026-06-10 (R3): mechanism unit-proven; unproducible live on this install (host fallback ~37s exceeds the deadline clamp, degrades to the designed fail-open timeout); correct for installs with faster host models*
+- [x] **APPR-07** Config kill switch disables the pre-phase entirely (T7)
+- [x] **APPR-08** Throttle gates: skip appraisal on social closers / near-duplicate turns (icarus precedent)
 
 ### SAFE — Fail-open + anti-creep (T3)
 
@@ -50,7 +50,7 @@ quality). Feature IDs (T*/D*) reference `.planning/research/FEATURES.md`.
 
 ### OBS — Observability (T10)
 
-- [ ] **OBS-01** Per-call telemetry to plugin's own SQLite: wall_ms, tokens, model, outcome (`ok|timeout|parse_fail|llm_error|skipped:<reason>`); failure counter + last-error surfaced (cf. silent-outage lesson, PR #43313)
+- [x] **OBS-01** Per-call telemetry to plugin's own SQLite: wall_ms, tokens, model, outcome (`ok|timeout|parse_fail|llm_error|skipped:<reason>`); failure counter + last-error surfaced (cf. silent-outage lesson, PR #43313)
 
 ### PKG — Packaging + PR prep
 
