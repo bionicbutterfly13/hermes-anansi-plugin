@@ -54,10 +54,10 @@ quality). Feature IDs (T*/D*) reference `.planning/research/FEATURES.md`.
 
 ### PKG — Packaging + PR prep
 
-- [ ] **PKG-01** Zero new pip dependencies (`pip_dependencies: []`); stdlib + host surfaces only
-- [ ] **PKG-02** Dual layout: standalone `$HERMES_HOME/plugins/anansi` + in-tree `plugins/` arrangement for the upstream PR; docs include the `plugins.entries.anansi.llm` config block
-- [ ] **PKG-03** Re-verify `ctx.llm` facade + manifest key (`provides_hooks` vs `hooks`) against upstream main before PR (local 0.16.0 fork carries 7 PRs of divergence)
-- [ ] **PKG-04** Upstream PR prepared but submitted ONLY after Dr. Mani sign-off (standing directive)
+- [x] **PKG-01** Zero new pip dependencies (`pip_dependencies: []`); stdlib + host surfaces only
+- [x] **PKG-02** Dual layout: standalone `$HERMES_HOME/plugins/anansi` + in-tree `plugins/` arrangement for the upstream PR; docs include the `plugins.entries.anansi.llm` config block
+- [x] **PKG-03** Re-verify `ctx.llm` facade + manifest key (`provides_hooks` vs `hooks`) against upstream main before PR (local 0.16.0 fork carries 7 PRs of divergence)
+- [x] **PKG-04** Upstream PR prepared but submitted ONLY after Dr. Mani sign-off (standing directive)
 
 ## v2 Requirements
 

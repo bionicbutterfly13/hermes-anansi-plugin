@@ -40,7 +40,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 3. After a session discussing topic X with a contradiction, the next session's appraisal surfaces it (one-turn-lag loop demonstrated end-to-end)
 4. No directive language detectable in any rendered block (pattern test green)
 
-## Phase 4 — Packaging + Upstream PR Prep
+## Phase 4 — Packaging + Upstream PR Prep — ✓ Complete 2026-06-10 (verification: passed, 13/13 must-haves, 3/3 criteria; PR PREPARED, submission awaits Dr. Mani sign-off — see 04-SIGNOFF.md)
 
 **Goal:** Contributable artifact — in-tree layout, docs, upstream-main parity — gated on sign-off.
 
