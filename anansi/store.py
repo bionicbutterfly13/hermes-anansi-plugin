@@ -594,12 +594,16 @@ def telemetry_summary(db_path=None):
     """Derived OBS-01 view: failure counter + last error, by query.
 
     Read-only URI connection — never creates files. Returns
-    {"total", "by_outcome", "failure_count", "last_error", "p50_wall_ms"}
-    where failure_count counts everything not ok/trust_fallback/skipped:*,
-    last_error is the error of the newest failure row (same definition —
-    skipped/trust_fallback rows carry no error and are not failures), and
-    p50_wall_ms is the median wall_ms over ok/trust_fallback rows.
-    Returns None on any error. Never raises.
+    {"total", "by_outcome", "failure_count", "last_error", "p50_wall_ms"}.
+    Non-failures are exactly ok/trust_fallback/reflect_ok plus the
+    skipped:* and reflect_skipped:* prefixes; failures are exactly
+    timeout/llm_error/parse_fail/reflect_timeout/reflect_llm_error/
+    reflect_parse_fail (exclusion-list shape on purpose — any future
+    unknown outcome counts as a failure). last_error is the error of the
+    newest failure row (same definition — skipped/trust_fallback/
+    reflect_ok rows carry no error and are not failures), and p50_wall_ms
+    is the median wall_ms over appraisal ok/trust_fallback rows only
+    (reflect_* walls excluded). Returns None on any error. Never raises.
     """
     conn = None
     try:
@@ -615,13 +619,14 @@ def telemetry_summary(db_path=None):
         failure_count = sum(
             count
             for outcome, count in by_outcome.items()
-            if outcome not in ("ok", "trust_fallback")
-            and not outcome.startswith("skipped:")
+            if outcome not in ("ok", "trust_fallback", "reflect_ok")
+            and not outcome.startswith(("skipped:", "reflect_skipped:"))
         )
         row = conn.execute(
             "SELECT error FROM telemetry"
-            " WHERE outcome NOT IN ('ok', 'trust_fallback')"
+            " WHERE outcome NOT IN ('ok', 'trust_fallback', 'reflect_ok')"
             " AND outcome NOT LIKE 'skipped:%'"
+            " AND outcome NOT LIKE 'reflect_skipped:%'"
             " ORDER BY id DESC LIMIT 1"
         ).fetchone()
         last_error = row[0] if row is not None else None

@@ -191,6 +191,35 @@ def test_telemetry_summary_counts_and_p50(tmp_path):
     assert summary["p50_wall_ms"] == 180  # median of [120, 180, 240]
 
 
+def test_telemetry_summary_reflect_vocabulary(tmp_path):
+    """Post-Phase-3 vocabulary (03-VERIFICATION finding 1): reflect_ok and
+    reflect_skipped:* are NOT failures; reflect_timeout (and the other
+    reflect_* error outcomes) are. p50_wall_ms stays appraisal-only."""
+    db = tmp_path / "state.db"
+    assert store.ensure_db(db) is True
+    store.record_telemetry("ok", wall_ms=120, db_path=db)
+    store.record_telemetry("timeout", error="deadline hit", db_path=db)
+    store.record_telemetry("reflect_ok", wall_ms=4400, db_path=db)
+    store.record_telemetry("reflect_skipped:debounce", db_path=db)
+    store.record_telemetry(  # newest row, distinct error string
+        "reflect_timeout", error="reflect deadline 8.0s exceeded", db_path=db
+    )
+
+    summary = store.telemetry_summary(db)
+    assert summary is not None
+    assert summary["total"] == 5
+    assert summary["by_outcome"] == {
+        "ok": 1,
+        "timeout": 1,
+        "reflect_ok": 1,
+        "reflect_skipped:debounce": 1,
+        "reflect_timeout": 1,
+    }
+    assert summary["failure_count"] == 2  # timeout + reflect_timeout only
+    assert summary["last_error"] == "reflect deadline 8.0s exceeded"
+    assert summary["p50_wall_ms"] == 120  # ok row only; reflect_ok wall excluded
+
+
 def test_telemetry_summary_absent_db_returns_none(tmp_path):
     assert store.telemetry_summary(tmp_path / "absent" / "state.db") is None
     assert not (tmp_path / "absent" / "state.db").exists()  # never creates
