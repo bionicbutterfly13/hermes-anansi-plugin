@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-06-10)
 ## Current Position
 
 Phase: 4 of 4 (Packaging + Upstream PR Prep)
-Plan: not yet planned
-Status: Phase 3 VERIFIED PASSED (d10300c: 18/18 must-haves, 4/4 criteria, 105/105 tests) — SAFE/REFL checkboxes flipped, Phase-3 banner set. Phase-4 carry-ins from 03-VERIFICATION: telemetry_summary reflect_* vocabulary gap (polish), sub-session appraisal timeout fraction (doc item), WAL sidecar copy idiom (PKG-02 inspection note)
-Last activity: 2026-06-10 — Phase 3 verified passed; live cross-session loop proven on attempt 1/1 (03-VALIDATION.md, 03-VERIFICATION.md)
+Plan: 04-01 COMPLETE — next: 04-02 (in-tree arrangement, upstream-main parity re-check, PR branch + PR_BODY.md)
+Status: Plan 04-01 executed (3 commits: 87484eb fix, 1a49dbb test, 5a9e751 docs; suite 105→107 green). All three 03-VERIFICATION carry-ins closed: telemetry_summary reflect_* vocabulary fixed + tested, sub-session timeout behavior documented, WAL sidecar copy idiom documented. PKG-01 provable by one test run; canonical plugin README + thin repo README in place
+Last activity: 2026-06-10 — Plan 04-01 complete (telemetry vocabulary fix, PKG-01 manifest proof, README pair)
 
-Progress: [████████░░] 80%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: ~1 session
-- Total execution time: ~6.5 hours
+- Total execution time: ~7 hours
 
 **By Phase:**
 
@@ -30,6 +30,7 @@ Progress: [████████░░] 80%
 | 1 — Skeleton + State | 2/2 | ~2h | ~1h |
 | 2 — Appraisal Path | 2/2 | ~2h | ~1h |
 | 3 — Fail-Open + Reflection | 3/3 | ~2.5h | ~1h |
+| 4 — Packaging + PR Prep | 1/2 | ~0.5h | ~0.5h |
 
 ## Accumulated Decisions
 
@@ -51,16 +52,18 @@ Progress: [████████░░] 80%
 | Dev tooling staged repo-locally (.devtools/pytest via uv --target); hermes venv never modified | 3 | uv-sync wipe risk locked in 03-CONTEXT; ./scripts/test.sh is the canonical test command |
 | Reflection raw read = `read_snapshot(include_decayed=True)` flag, not a second reader; apply_deltas busy-timeout default follows `_DEFAULT_BUSY_TIMEOUT_MS` | 3 | store.py stays the only sqlite surface; locked-DB tests govern the real write path (03-02) |
 | jsonschema (4.26.0) is live in the hermes venv: schema-rejected docs surface as parse_fail host-side; vocabulary-gating tested at the parse layer | 3 | Same split as Phase 2's parse_signals; full-path fake payloads must validate (03-02) |
+| telemetry_summary failure vocabulary keeps exclusion-list shape (non-failures: ok/trust_fallback/reflect_ok + skipped:*/reflect_skipped:*) | 4 | Unknown future outcomes count as failures by default — fail-loud in the derived view (04-01) |
+| PKG-01 manifest test asserts set equality between provides_hooks and AST-collected register_hook names | 4 | Catches both undeclared registrations and stale manifest entries (04-01) |
 
 ## Blockers / Concerns
 
 - ~~One-turn-lag ack~~ RESOLVED 2026-06-10: accepted by Dr. Mani; reflection carries appraisal context across the lag (R2)
 - ~~p50 5501ms vs ≤1.0s target~~ RESOLVED 2026-06-10: target revised to p50 ≤6s / 8.0s deadline, max quality (R1, Dr. Mani decision)
-- Upstream-main parity of ctx.llm facade + manifest keys must be re-verified before Phase 4 PR
-- `telemetry_summary` failure_count/last_error counts reflect_* outcomes as failures (vocabulary predates reflection) — Phase-4 doc/fix candidate (03-VALIDATION.md §6)
-- Host sub-sessions run the full hook set (appraisal + capture + reflection per sub-session; parallel haiku appraisals can contend into timeout — fail-open held live) — Phase-4 doc note (03-VALIDATION.md §9)
+- Upstream-main parity of ctx.llm facade + manifest keys must be re-verified before Phase 4 PR (04-02)
+- ~~`telemetry_summary` counts reflect_* outcomes as failures~~ RESOLVED 2026-06-10 (04-01, 87484eb): vocabulary fixed in both failure_count and last_error; mixed-outcome test added
+- ~~Host sub-sessions run the full hook set — Phase-4 doc note~~ RESOLVED 2026-06-10 (04-01): documented honestly in anansi/README.md (sub-session section + WAL sidecar idiom)
 
 ## Session Continuity
 
 Last session: 2026-06-10 (autonomous)
-Stopped at: Plan 03-03 complete (03-VALIDATION.md committed 183d41e; SUMMARY written; suite 105 green) — Phase 3 execution complete; next step verify-work for Phase 3
+Stopped at: Plan 04-01 complete (3 commits 87484eb/1a49dbb/5a9e751; SUMMARY written; suite 107 green) — next: execute 04-02 (in-tree arrangement, parity re-check, PR branch + PR_BODY.md, sign-off gate)
