@@ -30,6 +30,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 from conftest import assert_no_directive_language
 from anansi import appraisal, render
@@ -339,3 +340,48 @@ def test_safe04_only_write_open_is_the_debug_dump():
     assert 'open(dump_path, "a"' in line
     # And it was found by the call scan too (self-check of the regexes).
     assert any(name == "__init__.py" for name, _, _ in open_lines)
+
+
+# ---------------------------------------------------------------------------
+# PKG-01: manifest zero-dep proof
+# ---------------------------------------------------------------------------
+
+EXPECTED_HOOKS = {
+    "on_session_start", "pre_llm_call", "post_llm_call", "on_session_end",
+}
+
+
+def test_pkg01_manifest_zero_deps_and_accurate_hooks():
+    """PKG-01 manifest-side proof: ``pip_dependencies: []`` plus an accurate
+    ``provides_hooks`` list — the manifest key upstream's loader actually
+    reads (hermes_cli/plugins.py:1386 on upstream/main). The import-side
+    half of PKG-01 ("stdlib + host surfaces only") is proven by
+    test_safe04_import_allowlist (AST-based, this module); together the two
+    tests make PKG-01 observable from a single suite run."""
+    manifest = yaml.safe_load(
+        (PLUGIN_DIR / "plugin.yaml").read_text(encoding="utf-8")
+    )
+    assert manifest["pip_dependencies"] == []
+    assert manifest["kind"] == "standalone"
+    assert manifest["name"] == "anansi"
+    declared = manifest["provides_hooks"]
+    assert set(declared) == EXPECTED_HOOKS
+    assert len(declared) == len(EXPECTED_HOOKS)  # no duplicates
+
+    # Accuracy cross-check against the code: register(ctx) wires hooks via
+    # ctx.register_hook("<name>", <fn>) — the manifest must list exactly the
+    # hooks the plugin registers, no more, no fewer.
+    init_path = PLUGIN_DIR / "__init__.py"
+    tree = ast.parse(
+        init_path.read_text(encoding="utf-8"), filename=str(init_path)
+    )
+    registered = {
+        node.args[0].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "register_hook"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+    }
+    assert registered == set(declared)
