@@ -35,18 +35,18 @@ quality). Feature IDs (T*/D*) reference `.planning/research/FEATURES.md`.
 
 ### SAFE — Fail-open + anti-creep (T3)
 
-- [ ] **SAFE-01** Configurable executor-bounded wall-clock deadline on the appraisal call, default 8.0s (per-call socket timeouts don't bound wall time); p50 target ≤6s; zero retries beyond the trust-gate fallback — *revised 2026-06-10 (R1): Dr. Mani accepted ~5s p50 / max quality; live haiku appraisal is generation-bound at 4.4–7.3s, so the original 2.5–3.0s spec times out 100%*
-- [ ] **SAFE-02** Fail-open test matrix: LLM timeout, trust rejection, malformed JSON, truncation, `content: null`, locked/corrupt/absent DB, missing config — every case asserts no-raise + empty injection + normal turn
-- [ ] **SAFE-03** Unit test asserts no imperative/directive language patterns in any rendered block (anti: hidden second policy layer)
-- [ ] **SAFE-04** Plugin never executes tools/searches, never writes to the memory provider, never gates/delays a turn, never modifies its own prompt/config from reflection (locked anti-features)
+- [x] **SAFE-01** Configurable executor-bounded wall-clock deadline on the appraisal call, default 8.0s (per-call socket timeouts don't bound wall time); p50 target ≤6s; zero retries beyond the trust-gate fallback — *revised 2026-06-10 (R1): Dr. Mani accepted ~5s p50 / max quality; live haiku appraisal is generation-bound at 4.4–7.3s, so the original 2.5–3.0s spec times out 100%*
+- [x] **SAFE-02** Fail-open test matrix: LLM timeout, trust rejection, malformed JSON, truncation, `content: null`, locked/corrupt/absent DB, missing config — every case asserts no-raise + empty injection + normal turn
+- [x] **SAFE-03** Unit test asserts no imperative/directive language patterns in any rendered block (anti: hidden second policy layer)
+- [x] **SAFE-04** Plugin never executes tools/searches, never writes to the memory provider, never gates/delays a turn, never modifies its own prompt/config from reflection (locked anti-features)
 
 ### REFL — Session-end reflection (T9, shallow D1/D2)
 
-- [ ] **REFL-01** `on_session_end`: cheap bookkeeping (turn_log append) every firing; LLM reflection pass only on session-id change or N-turn debounce, applied in one idempotent WAL transaction (amended: hook fires per turn)
-- [ ] **REFL-02** Reflection extracts observations → bounded conservative deltas to affect summary, concerns, contradiction log, trust scores (the `apply_subconscious_observations` equivalent on SQLite) — *sharpened 2026-06-10 (R2): reflection is the carrier of appraisal context across the one-turn lag — the second half of the appraisal input contract. Inputs are user messages + assistant response text + state; NOT the injected memory block (ephemeral, never persisted to the transcript — verified conversation_loop.py:610-627)*
-- [ ] **REFL-03** Reflection inputs exclude sentinel-prefixed appraisal blocks (anti echo-chamber)
-- [ ] **REFL-04** Contradiction signals (semantic/narrative/relational/emotional) persisted and re-surfaced when relevant — shallow v1, validated against a fixture set before deepening (D1)
-- [ ] **REFL-05** Confidence/trust scores surfaced as advisory hints ("low confidence on X") — never a gate (D2)
+- [x] **REFL-01** `on_session_end`: cheap bookkeeping (turn_log append) every firing; LLM reflection pass only on session-id change or N-turn debounce, applied in one idempotent WAL transaction (amended: hook fires per turn)
+- [x] **REFL-02** Reflection extracts observations → bounded conservative deltas to affect summary, concerns, contradiction log, trust scores (the `apply_subconscious_observations` equivalent on SQLite) — *sharpened 2026-06-10 (R2): reflection is the carrier of appraisal context across the one-turn lag — the second half of the appraisal input contract. Inputs are user messages + assistant response text + state; NOT the injected memory block (ephemeral, never persisted to the transcript — verified conversation_loop.py:610-627)*
+- [x] **REFL-03** Reflection inputs exclude sentinel-prefixed appraisal blocks (anti echo-chamber)
+- [x] **REFL-04** Contradiction signals (semantic/narrative/relational/emotional) persisted and re-surfaced when relevant — shallow v1, validated against a fixture set before deepening (D1)
+- [x] **REFL-05** Confidence/trust scores surfaced as advisory hints ("low confidence on X") — never a gate (D2)
 
 ### OBS — Observability (T10)
 

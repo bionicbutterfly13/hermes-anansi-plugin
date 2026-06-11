@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-06-10)
 
 **Core value:** Every Hermes turn gets a grounded metacognitive appraisal injected before response generation — with zero capacity for autonomous action and zero impact on turn reliability.
-**Current focus:** Phase 3 — Fail-Open Hardening + Reflection
+**Current focus:** Phase 4 — Packaging + Upstream PR Prep
 
 ## Current Position
 
-Phase: 3 of 4 (Fail-Open Hardening + Reflection)
-Plan: 03-03 COMPLETE (3 of 3) — phase 3 execution complete, ready for verification
-Status: Plan 03-03 executed — live cross-session loop proven (ROADMAP criterion 3): session-A JWT/opaque-token contradiction reflected (reflect_ok 5616ms, contradiction id 2, trust 0.5→0.38) and surfaced verbatim in session B's block on attempt 1/1 incl. trust note; idempotence probed live (watermark stable across no-new-turn firings); p50 appraisal 5563ms ≤6s target; all 4 criteria evidenced in 03-VALIDATION.md; suite 105 green post-live-work
-Last activity: 2026-06-10 — Plan 03-03 complete (183d41e): 03-VALIDATION.md written; next step verify-work for Phase 3
+Phase: 4 of 4 (Packaging + Upstream PR Prep)
+Plan: not yet planned
+Status: Phase 3 VERIFIED PASSED (d10300c: 18/18 must-haves, 4/4 criteria, 105/105 tests) — SAFE/REFL checkboxes flipped, Phase-3 banner set. Phase-4 carry-ins from 03-VERIFICATION: telemetry_summary reflect_* vocabulary gap (polish), sub-session appraisal timeout fraction (doc item), WAL sidecar copy idiom (PKG-02 inspection note)
+Last activity: 2026-06-10 — Phase 3 verified passed; live cross-session loop proven on attempt 1/1 (03-VALIDATION.md, 03-VERIFICATION.md)
 
-Progress: [████████░░] 75%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 

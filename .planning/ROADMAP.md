@@ -28,7 +28,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 4. Quiet/duplicate turns inject nothing (suppression + throttle verified)
 5. Phase-0 items 5–7 (model quirks, contradiction fixture quality, telemetry) recorded
 
-## Phase 3 — Fail-Open Hardening + Reflection
+## Phase 3 — Fail-Open Hardening + Reflection — ✓ Complete 2026-06-10 (verification: passed, 18/18 must-haves, 4/4 criteria, 105/105 tests; see 03-VERIFICATION.md)
 
 **Goal:** Nothing the plugin does can hurt a turn; reflection becomes the carrier of appraisal context across the one-turn lag — the second half of the appraisal input contract, not polish. State actually learns across sessions. *(Sharpened 2026-06-10 R2; reflection inputs = messages + assistant responses + state, never the ephemeral injected memory block.)*
 
