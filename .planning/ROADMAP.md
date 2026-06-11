@@ -51,6 +51,16 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 2. `pip_dependencies: []` verified; test suite passes to host standards on upstream main
 3. PR branch + PR_BODY.md ready; submitted upstream as https://github.com/NousResearch/hermes-agent/pull/43906
 
+## Phase 5 — Proprietary Pivot State Reconciliation *(gap closure)*
+
+**Goal:** Restore learnship routing after the proprietary pivot: reconcile state with the withdrawn PR, expose the next proprietary discussion phase, and account for interrupted quick-task residue.
+
+**Closes:** v1.0 milestone audit integration/flow gaps — stale Phase 4 sign-off state; missing post-withdrawal roadmap path for proprietary Phase 5 discussion.
+
+**Status:** [ ] Not started
+
+**Depends on:** Phase 4
+
 ## Coverage
 
 | Phase | Requirements | Count |
@@ -59,4 +69,5 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 | 2 | APPR-01..08, OBS-01 | 9 |
 | 3 | SAFE-01..04, REFL-01..05 | 9 |
 | 4 | PKG-01..04 | 4 |
+| 5 | Audit gap closure — no new v1 requirement IDs | 0 |
 | **Total** | **31 / 31 v1 requirements** | ✓ 100% |
