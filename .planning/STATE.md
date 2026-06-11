@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-06-10)
 ## Current Position
 
 Phase: 4 of 4 (Packaging + Upstream PR Prep)
-Plan: 04-01 COMPLETE — next: 04-02 (in-tree arrangement, upstream-main parity re-check, PR branch + PR_BODY.md)
-Status: Plan 04-01 executed (3 commits: 87484eb fix, 1a49dbb test, 5a9e751 docs; suite 105→107 green). All three 03-VERIFICATION carry-ins closed: telemetry_summary reflect_* vocabulary fixed + tested, sub-session timeout behavior documented, WAL sidecar copy idiom documented. PKG-01 provable by one test run; canonical plugin README + thin repo README in place
-Last activity: 2026-06-10 — Plan 04-01 complete (telemetry vocabulary fix, PKG-01 manifest proof, README pair)
+Plan: 04-02 COMPLETE — phase 4 execution complete; ready for verification. PROJECT AT SIGN-OFF GATE
+Status: Plan 04-02 executed (plugin repo: 401a32b parity doc, d713892 PR_BODY + sign-off; worktree: 167be9f42 single in-tree commit). Parity re-verified at upstream/main 9dd9ef0ec (diff vs 183d86b3e EMPTY); worktree branch feat/anansi-plugin holds the in-tree arrangement (22 files, only plugins/anansi/* + tests/plugins/anansi/*); suite 111 passed in-tree under upstream pytest standards + 83 passed loader sanity. PR_BODY.md + 04-SIGNOFF.md committed. NOTHING PUSHED (ls-remote empty ×2; upstream push DISABLED). Submission awaits Dr. Mani's explicit approval via 04-SIGNOFF.md
+Last activity: 2026-06-10 — Plan 04-02 complete (parity re-check, in-tree arrangement + worktree branch, PR prep stopped at sign-off)
 
-Progress: [█████████░] 90%
+Progress: [█████████▓] 95% (execution done; sign-off + submission remain)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: ~1 session
-- Total execution time: ~7 hours
+- Total execution time: ~7.5 hours
 
 **By Phase:**
 
@@ -30,7 +30,7 @@ Progress: [█████████░] 90%
 | 1 — Skeleton + State | 2/2 | ~2h | ~1h |
 | 2 — Appraisal Path | 2/2 | ~2h | ~1h |
 | 3 — Fail-Open + Reflection | 3/3 | ~2.5h | ~1h |
-| 4 — Packaging + PR Prep | 1/2 | ~0.5h | ~0.5h |
+| 4 — Packaging + PR Prep | 2/2 | ~1h | ~0.5h |
 
 ## Accumulated Decisions
 
@@ -54,16 +54,19 @@ Progress: [█████████░] 90%
 | jsonschema (4.26.0) is live in the hermes venv: schema-rejected docs surface as parse_fail host-side; vocabulary-gating tested at the parse layer | 3 | Same split as Phase 2's parse_signals; full-path fake payloads must validate (03-02) |
 | telemetry_summary failure vocabulary keeps exclusion-list shape (non-failures: ok/trust_fallback/reflect_ok + skipped:*/reflect_skipped:*) | 4 | Unknown future outcomes count as failures by default — fail-loud in the derived view (04-01) |
 | PKG-01 manifest test asserts set equality between provides_hooks and AST-collected register_hook names | 4 | Catches both undeclared registrations and stale manifest entries (04-01) |
+| In-tree tests are a package (`tests.plugins.anansi.*`); plugin loads as module `anansi` via conftest spec-load, never `plugins.anansi` | 4 | Three-module-identity trap avoided; worktree root force-inserted at sys.path[0] shadows the editable install (04-02) |
+| .devtools/pytest staged at upstream pins (pytest 9.0.2, pytest-timeout 2.4.0, pytest-asyncio 1.3.0) | 4 | Worktree runs need upstream's addopts (--timeout); plugin-repo suite re-verified green under the pins (04-02) |
 
 ## Blockers / Concerns
 
 - ~~One-turn-lag ack~~ RESOLVED 2026-06-10: accepted by Dr. Mani; reflection carries appraisal context across the lag (R2)
 - ~~p50 5501ms vs ≤1.0s target~~ RESOLVED 2026-06-10: target revised to p50 ≤6s / 8.0s deadline, max quality (R1, Dr. Mani decision)
-- Upstream-main parity of ctx.llm facade + manifest keys must be re-verified before Phase 4 PR (04-02)
+- ~~Upstream-main parity of ctx.llm facade + manifest keys must be re-verified before Phase 4 PR~~ RESOLVED 2026-06-10 (04-02, 04-PARITY.md): diff vs 183d86b3e EMPTY at PR-time SHA 9dd9ef0ec; all surfaces verified by fresh grep
+- PR SUBMISSION GATE: branch + PR_BODY prepared, NOTHING pushed — awaiting Dr. Mani's explicit approval (04-SIGNOFF.md carries the exact commands)
 - ~~`telemetry_summary` counts reflect_* outcomes as failures~~ RESOLVED 2026-06-10 (04-01, 87484eb): vocabulary fixed in both failure_count and last_error; mixed-outcome test added
 - ~~Host sub-sessions run the full hook set — Phase-4 doc note~~ RESOLVED 2026-06-10 (04-01): documented honestly in anansi/README.md (sub-session section + WAL sidecar idiom)
 
 ## Session Continuity
 
 Last session: 2026-06-10 (autonomous)
-Stopped at: Plan 04-01 complete (3 commits 87484eb/1a49dbb/5a9e751; SUMMARY written; suite 107 green) — next: execute 04-02 (in-tree arrangement, parity re-check, PR branch + PR_BODY.md, sign-off gate)
+Stopped at: Plan 04-02 complete (plugin repo 401a32b + d713892; worktree 167be9f42 on feat/anansi-plugin @ 9dd9ef0ec; 111 passed in-tree, 83 loader sanity; zero pushes) — next: verify-work, then Dr. Mani reads .planning/phases/04-packaging-pr-prep/04-SIGNOFF.md and approves or amends submission
