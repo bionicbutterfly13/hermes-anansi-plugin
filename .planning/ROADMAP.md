@@ -40,7 +40,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 3. After a session discussing topic X with a contradiction, the next session's appraisal surfaces it (one-turn-lag loop demonstrated end-to-end)
 4. No directive language detectable in any rendered block (pattern test green)
 
-## Phase 4 — Packaging + Upstream PR Prep — ✓ Complete 2026-06-10 (verification: passed, 13/13 must-haves, 3/3 criteria; PR PREPARED, submission awaits Dr. Mani sign-off — see 04-SIGNOFF.md)
+## Phase 4 — Packaging + Upstream PR Prep — ✓ Complete 2026-06-10 (verification: passed, 13/13 must-haves, 3/3 criteria; PR #43906 submitted then WITHDRAWN 2026-06-10 — plugin is proprietary, see research/DESIGN-REWIND-2026-06-10.md)
 
 **Goal:** Contributable artifact — in-tree layout, docs, upstream-main parity — gated on sign-off.
 
@@ -49,7 +49,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 **Success criteria:**
 1. Plugin installs cleanly in both layouts (standalone `$HERMES_HOME/plugins/anansi` and in-tree `plugins/`)
 2. `pip_dependencies: []` verified; test suite passes to host standards on upstream main
-3. PR branch + PR_BODY.md ready; **submission blocked pending Dr. Mani sign-off**
+3. PR branch + PR_BODY.md ready; submitted upstream as https://github.com/NousResearch/hermes-agent/pull/43906
 
 ## Coverage
 

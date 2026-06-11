@@ -1,15 +1,34 @@
-# Sign-Off: anansi Upstream PR — Prepared, NOT Submitted
+# Sign-Off: anansi Upstream PR — Submitted
 
-**Prepared:** 2026-06-10 (~9:00pm EDT) — **awaiting Dr. Mani's sign-off**
-**Branch:** `feat/anansi-plugin` (one commit: `167be9f42bb339e323e8d8bddd7f62a8c68282d1`)
+**Prepared:** 2026-06-10 (~9:00pm EDT); refreshed and submitted 2026-06-10 (~10:15pm EDT)
+**Branch:** `feat/anansi-plugin` (one commit: `832d52b88d8bfe2747ed3919160fefcf814bb255`)
 **Worktree:** `/Users/manisaintvictor/.hermes/worktrees/pr-anansi`
-**Base:** upstream/main @ `9dd9ef0ec99a87f078f7272b4323df5440b4b3f9` (fetched fresh this run)
+**Base:** upstream/main @ `3ffbdfbcc0dce5b859411666677e0f86d583dda0` (fetched fresh, rebased cleanly before submission)
 **Target:** NousResearch/hermes-agent, via fork bionicbutterfly13/hermes-agent-lab
-**Pushed anywhere:** NO — `git ls-remote origin feat/anansi-plugin` verified empty; upstream push remains DISABLED.
+**PR:** https://github.com/NousResearch/hermes-agent/pull/43906
+**Pushed:** YES — fork branch `bionicbutterfly13:feat/anansi-plugin` points at `832d52b88d8bfe2747ed3919160fefcf814bb255`; upstream push remains DISABLED.
 
 ---
 
-## 1. Diff stat (verbatim, `git diff upstream/main...HEAD --stat` in the worktree)
+## 1. Completion criteria
+
+This sign-off task is complete only when all of the following are true from live evidence:
+
+1. Upstream `main` has been fetched immediately before submission; the PR branch is rebased
+   on that tip, with `HEAD~1 == upstream/main`.
+2. The parity diff from Phase-1 baseline `183d86b3e` through the submission base is empty
+   across `hermes_cli/plugins.py`, `agent/plugin_llm.py`,
+   `tests/agent/test_plugin_llm.py`, and `plugins/`.
+3. The PR branch diff touches only `plugins/anansi/` and
+   `tests/plugins/anansi/`, with the expected 22-file stat.
+4. The plugin repo suite, in-tree plugin suite, and host loader sanity suite pass after the
+   rebase.
+5. `PR_BODY.md` references the same upstream base SHA as this sign-off file.
+6. The branch is pushed to `bionicbutterfly13/hermes-agent-lab`, and a PR exists against
+   `NousResearch/hermes-agent:main` from `bionicbutterfly13:feat/anansi-plugin`.
+7. Upstream push remains disabled; no direct push to `NousResearch/hermes-agent` occurs.
+
+## 2. Diff stat (verbatim, `git diff upstream/main...HEAD --stat` in the worktree)
 
 ```
  plugins/anansi/README.md                  | 182 +++++
@@ -40,7 +59,7 @@
 Nothing outside `plugins/anansi/` and `tests/plugins/anansi/` is touched
 (`git diff upstream/main...HEAD --name-only` filtered against those two prefixes: empty).
 
-## 2. Suite proof (upstream pytest standards: `-m 'not integration' --timeout=30 --timeout-method=thread`)
+## 3. Suite proof (upstream pytest standards: `-m 'not integration' --timeout=30 --timeout-method=thread`)
 
 Plugin suite in the worktree (107 plugin tests + 4 new in-tree layout/discovery tests):
 
@@ -48,7 +67,7 @@ Plugin suite in the worktree (107 plugin tests + 4 new in-tree layout/discovery 
 $ cd /Users/manisaintvictor/.hermes/worktrees/pr-anansi && \
   PYTHONPATH="$PWD:/Volumes/Asylum/repos/hermes-anansi-plugin/.devtools/pytest" \
   ~/.hermes/hermes-agent/venv/bin/python -m pytest tests/plugins/anansi -q
-111 passed, 1 warning in 6.70s
+111 passed, 1 warning in 7.71s
 ```
 
 Host loader sanity (proves the arrangement doesn't disturb the loader's own tests):
@@ -57,7 +76,7 @@ Host loader sanity (proves the arrangement doesn't disturb the loader's own test
 $ cd /Users/manisaintvictor/.hermes/worktrees/pr-anansi && \
   PYTHONPATH="$PWD:/Volumes/Asylum/repos/hermes-anansi-plugin/.devtools/pytest" \
   ~/.hermes/hermes-agent/venv/bin/python -m pytest tests/hermes_cli/test_plugins.py -q
-83 passed, 1 warning in 14.35s
+83 passed, 1 warning in 11.34s
 ```
 
 (The 1 warning in each run is a third-party `audioop` DeprecationWarning from the venv's
@@ -67,16 +86,24 @@ code), shadowing the editable install of the local-desktop-fixes branch. Dev too
 (pytest 9.0.2 / pytest-timeout 2.4.0 / pytest-asyncio 1.3.0 — upstream's pins) is staged
 in the plugin repo's gitignored `.devtools/pytest`; the hermes venv was not modified.
 
-## 3. Parity
+Plugin repo suite:
 
-upstream/main moved d1383a6b1 → 9dd9ef0ec between planning and PR prep (one web-only
-commit). The parity diff vs the Phase-1 baseline 183d86b3e across all four surfaces
+```
+$ cd /Volumes/Asylum/repos/hermes-anansi-plugin && ./scripts/test.sh
+107 passed in 4.19s
+```
+
+## 4. Parity
+
+upstream/main moved d1383a6b1 → 9dd9ef0ec between planning and PR prep, then
+9dd9ef0ec → 3ffbdfbcc before submission. The parity diff vs the Phase-1 baseline
+183d86b3e across all four surfaces
 (`hermes_cli/plugins.py`, `agent/plugin_llm.py`, `tests/agent/test_plugin_llm.py`,
-`plugins/`) is EMPTY at 9dd9ef0ec; `provides_hooks` is still the loader-read manifest key
+`plugins/`) is EMPTY at 3ffbdfbcc; `provides_hooks` is still the loader-read manifest key
 (plugins.py:1386) and the `complete_structured` keyword-only signature is a superset of
 every kwarg the plugin passes. Full evidence: `04-PARITY.md`.
 
-## 4. PR body (full inline copy of PR_BODY.md)
+## 5. PR body (full inline copy of PR_BODY.md)
 
 ---
 
@@ -142,7 +169,7 @@ advisory observational signals; not instructions; do not act on these beyond inf
 
 ## Evidence (from live validation, 2026-06-10)
 
-- **Hermetic suite:** 111 passed in-tree at upstream/main `9dd9ef0ec` (107 plugin
+- **Hermetic suite:** 111 passed in-tree at upstream/main `3ffbdfbcc` (107 plugin
   tests + 4 layout/discovery tests), fully offline, under this repo's pytest config
   (`-m 'not integration' --timeout=30 --timeout-method=thread`).
 - **Latency (live, anthropic `claude-haiku-4-5`):** appraisal p50 5563.5ms over the
@@ -190,7 +217,7 @@ advisory observational signals; not instructions; do not act on these beyond inf
 ## Parity
 
 Built and tested against upstream/main at
-`9dd9ef0ec99a87f078f7272b4323df5440b4b3f9` (2026-06-10). All host surfaces the
+`3ffbdfbcc0dce5b859411666677e0f86d583dda0` (2026-06-10 refresh). All host surfaces the
 plugin depends on — the plugin loader's `provides_hooks` manifest key, the
 `ctx.llm.complete_structured` keyword-only signature, `PluginLlmTrustError`, and
 `make_plugin_llm_for_test` — are unchanged since first verification at `183d86b3e`;
@@ -221,7 +248,7 @@ no adaptation was needed.
 
 *(end of PR body)*
 
-## 5. How to submit (NOT executed by this run — copy-paste ready, requires your approval)
+## 6. Submit commands (executed)
 
 ```bash
 # 1. Push the branch to the fork (origin = bionicbutterfly13/hermes-agent-lab):
@@ -234,21 +261,30 @@ gh pr create --repo NousResearch/hermes-agent \
   --body-file /Volumes/Asylum/repos/hermes-anansi-plugin/.planning/phases/04-packaging-pr-prep/PR_BODY.md
 ```
 
-Notes for the moment of submission:
+Submission notes:
 - The base branch on NousResearch/hermes-agent is `main`; the prepared branch is based
-  at `9dd9ef0ec...` (current main at prep time). If main moves substantially before you
-  submit, re-running the 04-PARITY diff against the new tip takes one command.
-- A possible rename of the plugin (open item in `.planning/DECISIONS.md`) is cheapest
-  BEFORE pushing.
+  at `3ffbdfbcc...` (current main at submission time).
+- A possible rename of the plugin is now post-submission PR churn; this artifact preserves
+  the submitted `anansi` name.
 
-## 6. Final state checks (this run)
+## 7. Final state checks (submitted)
 
-- `git ls-remote origin feat/anansi-plugin` → empty (nothing pushed)
+- `git ls-remote origin feat/anansi-plugin` → `832d52b88d8bfe2747ed3919160fefcf814bb255`
+- `gh pr view 43906 --repo NousResearch/hermes-agent` → OPEN, non-draft, base `main`, head `bionicbutterfly13:feat/anansi-plugin`, commit `832d52b88d8bfe2747ed3919160fefcf814bb255`, mergeStateStatus `BLOCKED`
 - `git remote -v` in ~/.hermes/hermes-agent → upstream push DISABLED (unchanged)
 - hermes-agent main working tree clean on `local-desktop-fixes`
 - Live symlink `~/.hermes/plugins/anansi` → plugin repo (intact); `~/.hermes/plugins/anansi` never entered
 - Plugin-repo suite green (`./scripts/test.sh`)
 
-## 7.
+## 8. Submitted
 
-STOP — nothing has been pushed to any remote. Submission requires Dr. Mani's explicit approval.
+Submitted upstream PR: https://github.com/NousResearch/hermes-agent/pull/43906
+
+---
+
+## 8. WITHDRAWN (2026-06-10 ~10:20pm EDT, Dr. Mani's decision)
+
+PR #43906 CLOSED with withdrawal comment; branch `feat/anansi-plugin` DELETED from the
+fork (ls-remote verified empty). The plugin is now PROPRIETARY — no upstream contribution of the
+plugin itself. Local worktree and all code retained. Design rewind underway:
+see `.planning/research/DESIGN-REWIND-2026-06-10.md`.
