@@ -51,15 +51,23 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 2. `pip_dependencies: []` verified; test suite passes to host standards on upstream main
 3. PR branch + PR_BODY.md ready; submitted upstream as https://github.com/NousResearch/hermes-agent/pull/43906
 
-## Phase 5 — Proprietary Pivot State Reconciliation *(gap closure)*
+## Phase 5 — Proprietary Pivot State Reconciliation *(gap-closure cleanup)*
 
 **Goal:** Restore learnship routing after the proprietary pivot: reconcile state with the withdrawn PR, expose the next proprietary discussion phase, and account for interrupted quick-task residue.
 
 **Closes:** v1.0 milestone audit integration/flow gaps — stale Phase 4 sign-off state; missing post-withdrawal roadmap path for proprietary Phase 5 discussion.
 
-**Status:** [ ] Not started
+**Status:** [~] Cleanup only — reconciles planning state after PR #43906 withdrawal; no plugin code or proprietary feature implementation.
 
 **Depends on:** Phase 4
+
+## Phase 6 — Proprietary User Model + Drive Design *(discussion/design only)*
+
+**Goal:** Discuss and design the proprietary direction before implementation: layered autobiographical user model, aligned drive/goals, scheduled heartbeat, user-dopamine, worldview, and reconsolidation direction.
+
+**Status:** [ ] Not started — next workflow is `discuss-phase 6`.
+
+**Depends on:** Phase 5 cleanup
 
 ## Coverage
 
@@ -70,4 +78,5 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 | 3 | SAFE-01..04, REFL-01..05 | 9 |
 | 4 | PKG-01..04 | 4 |
 | 5 | Audit gap closure — no new v1 requirement IDs | 0 |
+| 6 | Proprietary design discussion — no v1 requirement IDs | 0 |
 | **Total** | **31 / 31 v1 requirements** | ✓ 100% |
