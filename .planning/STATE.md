@@ -4,17 +4,17 @@
 
 See: .planning/PROJECT.md (updated 2026-06-10)
 
-**Core value:** Every Hermes turn gets a grounded metacognitive appraisal injected before response generation — with zero capacity for autonomous action and zero impact on turn reliability.
-**Current focus:** Phase 4 — Packaging + Upstream PR Prep
+**Core value:** Every Hermes turn gets a grounded metacognitive appraisal injected before response generation; after PR #43906 was withdrawn, the plugin is proprietary and v1 remains the foundation.
+**Current focus:** Phase 5 — Proprietary Pivot State Reconciliation
 
 ## Current Position
 
-Phase: 4 of 4 (Packaging + Upstream PR Prep)
-Plan: 04-02 COMPLETE — Phase 4 VERIFIED PASSED (30e07c8: 13/13 must-haves, 3/3 criteria). PROJECT EXECUTION COMPLETE — AT SIGN-OFF GATE
-Status: Plan 04-02 executed (plugin repo: 401a32b parity doc, d713892 PR_BODY + sign-off; worktree: 167be9f42 single in-tree commit). Parity re-verified at upstream/main 9dd9ef0ec (diff vs 183d86b3e EMPTY); worktree branch feat/anansi-plugin holds the in-tree arrangement (22 files, only plugins/anansi/* + tests/plugins/anansi/*); suite 111 passed in-tree under upstream pytest standards + 83 passed loader sanity. PR_BODY.md + 04-SIGNOFF.md committed. NOTHING PUSHED (ls-remote empty ×2; upstream push DISABLED). Submission awaits Dr. Mani's explicit approval via 04-SIGNOFF.md
-Last activity: 2026-06-10 — Phase 4 verified passed; all 31/31 v1 requirements checked; PR submission is the ONLY remaining step, gated on Dr. Mani reading 04-SIGNOFF.md
+Phase: 5 of 5 (Proprietary Pivot State Reconciliation)
+Plan: CONTEXT COMPLETE — ready for plan-phase 5
+Status: Phase 5 was added as a v1.0 audit gap-closure phase. 05-CONTEXT.md and 05-DISCUSSION-LOG.md capture the decisions: reconcile STATE.md away from obsolete PR sign-off routing, commit/use the milestone audit as source of truth, account for interrupted quick-task residue, and keep proprietary user-model/drive design in a separate Phase 6 discussion lane.
+Last activity: 2026-06-11 — Captured Phase 5 context; next workflow is plan-phase 5.
 
-Progress: [█████████▓] 98% (all phases verified; sign-off + submission remain)
+Progress: [█████████▓] 98% (v1 requirements verified; audit gap-closure phase ready to plan)
 
 ## Performance Metrics
 
@@ -62,11 +62,11 @@ Progress: [█████████▓] 98% (all phases verified; sign-off + 
 - ~~One-turn-lag ack~~ RESOLVED 2026-06-10: accepted by Dr. Mani; reflection carries appraisal context across the lag (R2)
 - ~~p50 5501ms vs ≤1.0s target~~ RESOLVED 2026-06-10: target revised to p50 ≤6s / 8.0s deadline, max quality (R1, Dr. Mani decision)
 - ~~Upstream-main parity of ctx.llm facade + manifest keys must be re-verified before Phase 4 PR~~ RESOLVED 2026-06-10 (04-02, 04-PARITY.md): diff vs 183d86b3e EMPTY at PR-time SHA 9dd9ef0ec; all surfaces verified by fresh grep
-- PR SUBMISSION GATE: branch + PR_BODY prepared, NOTHING pushed — awaiting Dr. Mani's explicit approval (04-SIGNOFF.md carries the exact commands)
+- ~~PR SUBMISSION GATE~~ CLOSED 2026-06-10: PR #43906 was submitted, then withdrawn by Dr. Mani decision; fork branch deleted; no upstream plugin submission remains pending.
 - ~~`telemetry_summary` counts reflect_* outcomes as failures~~ RESOLVED 2026-06-10 (04-01, 87484eb): vocabulary fixed in both failure_count and last_error; mixed-outcome test added
 - ~~Host sub-sessions run the full hook set — Phase-4 doc note~~ RESOLVED 2026-06-10 (04-01): documented honestly in anansi/README.md (sub-session section + WAL sidecar idiom)
 
 ## Session Continuity
 
-Last session: 2026-06-10 (autonomous)
-Stopped at: Plan 04-02 complete (plugin repo 401a32b + d713892; worktree 167be9f42 on feat/anansi-plugin @ 9dd9ef0ec; 111 passed in-tree, 83 loader sanity; zero pushes) — next: verify-work, then Dr. Mani reads .planning/phases/04-packaging-pr-prep/04-SIGNOFF.md and approves or amends submission
+Last session: 2026-06-11 (discuss-phase 5)
+Stopped at: Phase 5 context captured and committed; next: plan-phase 5.
