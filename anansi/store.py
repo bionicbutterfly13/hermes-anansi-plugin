@@ -209,28 +209,6 @@ def _create_fresh(path: Path) -> bool:
                 pass
 
 
-def _try_migrate_legacy_state(path: Path) -> None:
-    """Move the v1 state DB into the Anansi state directory if needed.
-
-    This is the only legacy namespace bridge in runtime code. It runs only
-    when the new DB is absent; failures degrade to fresh DB creation.
-    """
-    try:
-        legacy = path.parent.parent / "anansi" / "state.db"
-        if path.exists() or not legacy.exists():
-            return
-        path.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(legacy, path)
-        for suffix in ("-wal", "-shm"):
-            src = Path(str(legacy) + suffix)
-            if src.exists():
-                os.replace(src, Path(str(path) + suffix))
-        logger.info("anansi migrated legacy v1 state DB to %s", path)
-    except Exception as exc:
-        logger.warning("anansi legacy state migration failed (degrading): %s", exc)
-        logger.debug("legacy migration failure detail", exc_info=True)
-
-
 def ensure_db(db_path=None) -> bool:
     """Create the DB + schema if absent; verify structure if present.
 
@@ -241,8 +219,6 @@ def ensure_db(db_path=None) -> bool:
     try:
         path = Path(db_path) if db_path is not None else get_db_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        if db_path is None:
-            _try_migrate_legacy_state(path)
         if path.exists():
             if _verify_structure(path):
                 return True

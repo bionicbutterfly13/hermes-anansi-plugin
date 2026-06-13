@@ -1,32 +1,35 @@
 # PKG-03 Parity Re-Check — Upstream Main at PR Time
 
-**Run:** 2026-06-10 ~8:50pm EDT
-**PR-time upstream/main SHA:** `9dd9ef0ec99a87f078f7272b4323df5440b4b3f9`
+**Run:** 2026-06-10 ~8:50pm EDT; refreshed before submission at ~10:10pm EDT
+**PR-time upstream/main SHA:** `3ffbdfbcc0dce5b859411666677e0f86d583dda0`
 **Phase-1 baseline SHA:** `183d86b3e`
-**Distance:** 34 commits (`git rev-list --count 183d86b3e..9dd9ef0ec` = 34; main moved
-d1383a6b1 → 9dd9ef0ec between planning ~8:25pm and this run — one new commit,
-`fix(web): profiles page modal (#43858)`, web-only).
+**Distance:** 36 commits (`git rev-list --count 183d86b3e..3ffbdfbcc` = 36; main moved
+d1383a6b1 → 9dd9ef0ec between planning ~8:25pm and the first PR-prep run, then
+9dd9ef0ec → 3ffbdfbcc before submission — the two latest commits are
+`fix(streaming): stop socket read timeout from preempting stale-stream detector (#43570)`
+and `desktop: registry-driven slash commands + first-class /resume & /handoff (#42351)`).
 
 ## Fetch + Diff (verbatim)
 
 ```
 $ git -C ~/.hermes/hermes-agent fetch upstream
    d1383a6b1..9dd9ef0ec  main       -> upstream/main
+   9dd9ef0ec..3ffbdfbcc  main       -> upstream/main
 $ git -C ~/.hermes/hermes-agent rev-parse upstream/main
-9dd9ef0ec99a87f078f7272b4323df5440b4b3f9
+3ffbdfbcc0dce5b859411666677e0f86d583dda0
 
-$ git -C ~/.hermes/hermes-agent diff --stat 183d86b3e 9dd9ef0ec99a87f078f7272b4323df5440b4b3f9 \
+$ git -C ~/.hermes/hermes-agent diff --stat 183d86b3e 3ffbdfbcc0dce5b859411666677e0f86d583dda0 \
     -- hermes_cli/plugins.py agent/plugin_llm.py tests/agent/test_plugin_llm.py plugins/
 (empty — exit 0)
 ```
 
 **Verdict: PARITY HOLDS.** All four surfaces (`hermes_cli/plugins.py`,
 `agent/plugin_llm.py`, `tests/agent/test_plugin_llm.py`, `plugins/`) are byte-identical
-from the Phase-1 baseline 183d86b3e through the PR-time SHA 9dd9ef0ec.
+from the Phase-1 baseline 183d86b3e through the PR-time SHA 3ffbdfbcc.
 
 ## Manifest-Key Verdict
 
-Fresh grep at the PR-time SHA (`git show 9dd9ef0ec:hermes_cli/plugins.py`):
+Fresh grep at the PR-time SHA (`git show 3ffbdfbcc:hermes_cli/plugins.py`):
 
 ```
 245:    provides_hooks: List[str] = field(default_factory=list)
@@ -40,7 +43,7 @@ metadata. Our `plugin.yaml` uses `provides_hooks` — the correct, loader-read k
 
 ## `complete_structured` / Trust-Gate Verdict
 
-Fresh grep at the PR-time SHA (`git show 9dd9ef0ec:agent/plugin_llm.py`):
+Fresh grep at the PR-time SHA (`git show 3ffbdfbcc:agent/plugin_llm.py`):
 
 ```
 249:class PluginLlmTrustError(PermissionError):
@@ -48,7 +51,7 @@ Fresh grep at the PR-time SHA (`git show 9dd9ef0ec:agent/plugin_llm.py`):
 1016:def make_plugin_llm_for_test(
 ```
 
-Signature at 9dd9ef0ec (plugin_llm.py:683) is keyword-only:
+Signature at 3ffbdfbcc (plugin_llm.py:683) is keyword-only:
 `(instructions, input, json_schema, json_mode, schema_name, system_prompt, provider,
 model, temperature, max_tokens, timeout, agent_id, profile, purpose)`.
 
@@ -61,8 +64,8 @@ check holds.** `PluginLlmTrustError` (line 249, the trust-gate fallback trigger)
 
 ## Conclusion (for PR_BODY)
 
-Built and tested against upstream/main at `9dd9ef0ec99a87f078f7272b4323df5440b4b3f9`
-(2026-06-10). All host surfaces the plugin depends on — the plugin loader's
+Built and tested against upstream/main at `3ffbdfbcc0dce5b859411666677e0f86d583dda0`
+(2026-06-10 refresh). All host surfaces the plugin depends on — the plugin loader's
 `provides_hooks` manifest key, the `ctx.llm.complete_structured` keyword-only signature,
 `PluginLlmTrustError`, and `make_plugin_llm_for_test` — are byte-identical to the
 Phase-1 verification baseline (183d86b3e); no adaptation was needed.

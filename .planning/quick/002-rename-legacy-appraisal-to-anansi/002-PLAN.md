@@ -9,15 +9,15 @@ files_modified:
   - README.md
   - AGENTS.md
   - CLAUDE.md
-  - .planning/quick/002-rename-anansi-to-anansi/002-SUMMARY.md
+  - .planning/quick/002-rename-legacy-appraisal-to-anansi/002-SUMMARY.md
 autonomous: true
 single_layer_justified: true
-objective: "Rename the active plugin/runtime identity from anansi to Anansi while preserving behavior and migration safety."
+objective: "Scrub remaining legacy naming after the Anansi runtime rename while preserving behavior."
 must_haves:
   truths:
-    - "The active Python package directory is `anansi/`, and no active `anansi/` package remains."
+    - "The active Python package directory is `anansi/`, and no old-name package remains."
     - "The plugin manifest name is `anansi` and config lookup uses `plugins.entries.anansi`."
-    - "The state store resolves `$HERMES_HOME/anansi/state.db` and has a narrow legacy migration path from the old v1 state location."
+    - "The state store resolves `$HERMES_HOME/anansi/state.db`."
     - "The rendered sentinel is `[anansi appraisal]`."
     - "`./scripts/test.sh` passes."
   artifacts:
@@ -27,13 +27,13 @@ must_haves:
     - anansi/tests
   key_links:
     - "README.md points to `anansi/README.md`."
-    - "AGENTS.md and CLAUDE.md no longer describe the active plugin source as `anansi/`."
+    - "AGENTS.md and CLAUDE.md describe the active plugin source as `anansi/`."
 ---
 
 # Plan 002: Rename Runtime Identity to Anansi
 
 <objective>
-This plan renames the active plugin namespace, config key, state path, docs, tests, and scripts from the legacy anansi identity to Anansi. Behavior stays the same: hook lifecycle, fail-open discipline, SQLite storage, no new dependencies, and test surfaces remain intact. A narrow legacy state migration path preserves existing local state without keeping an old plugin alias.
+This plan removes remaining old-name text from planning artifacts, research notes, quick-task records, local metadata, and runtime cleanup leftovers after the Anansi rename. Behavior stays the same: hook lifecycle, fail-open discipline, SQLite storage, no new dependencies, and test surfaces remain intact.
 </objective>
 
 ## Tasks
@@ -47,7 +47,7 @@ This plan renames the active plugin namespace, config key, state path, docs, tes
 - scripts/live_contradiction_fixtures.py
 </files>
 <action>
-Move `anansi/` to `anansi/`. Update Python imports, plugin id strings, manifest name, logging namespaces, thread names, debug env var, active config key, active state path, rendered sentinel, live scripts, and test paths to use `anansi` / `[anansi appraisal]`. In `anansi/store.py`, add a narrowly scoped legacy migration helper that moves an existing `$HERMES_HOME/anansi/state.db` and WAL sidecars to `$HERMES_HOME/anansi/state.db` only when the new DB does not exist.
+Remove any remaining old-name text from runtime cleanup leftovers, tests, scripts, docs, planning artifacts, research notes, and local metadata. Do not keep a runtime migration helper that requires the old name.
 </action>
 <verify>
 `rg -n "anansi|\\[anansi appraisal\\]|ANANSI|plugins\\.entries\\.anansi|\\$HERMES_HOME/anansi" anansi scripts README.md AGENTS.md CLAUDE.md`
@@ -66,15 +66,15 @@ The active runtime package is `anansi`, tests import `anansi`, the manifest name
 - AGENTS.md
 - CLAUDE.md
 - anansi/README.md
-- .planning/quick/002-rename-anansi-to-anansi/002-SUMMARY.md
+- .planning/quick/002-rename-legacy-appraisal-to-anansi/002-SUMMARY.md
 </files>
 <action>
-Update active repo docs and agent-facing instructions so this project presents Anansi as the active plugin identity. Keep historical Anansi references only where they describe old source material, the legacy v1 name, or the narrow migration path. Write `002-SUMMARY.md` with files changed, verification results, dirty-state boundaries, and any intentional legacy references that remain.
+Update active repo docs and agent-facing instructions so this project presents Anansi as the active plugin identity. Write `002-SUMMARY.md` with files changed, verification results, and dirty-state boundaries.
 </action>
 <verify>
-`rg -n "anansi|Hermes Anansi Memory Plugin|\\[anansi appraisal\\]|plugins\\.entries\\.anansi|\\$HERMES_HOME/anansi" README.md AGENTS.md CLAUDE.md anansi/README.md .planning/quick/002-rename-anansi-to-anansi`
+`rg -n "anansi|Hermes Anansi Memory Plugin|\\[anansi appraisal\\]|plugins\\.entries\\.anansi|\\$HERMES_HOME/anansi" README.md AGENTS.md CLAUDE.md anansi/README.md .planning/quick/002-rename-legacy-appraisal-to-anansi`
 </verify>
 <done>
-Active docs use Anansi as the plugin identity, quick-task summary exists, and any remaining legacy references are explicitly migration/history scoped.
+Active docs use Anansi as the plugin identity, and the quick-task summary exists.
 </done>
 </task>

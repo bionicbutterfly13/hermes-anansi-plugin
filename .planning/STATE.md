@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-06-10)
 
 **Core value:** Every Hermes turn gets a grounded metacognitive appraisal injected before response generation; after PR #43906 was withdrawn, the plugin is proprietary and v1 remains the foundation.
-**Current focus:** Phase 5 — Proprietary Pivot State Reconciliation
+**Current focus:** Phase 6 — Proprietary User Model + Drive Design discussion
 
 ## Current Position
 
-Phase: 5 of 5 (Proprietary Pivot State Reconciliation)
-Plan: CONTEXT COMPLETE — ready for plan-phase 5
-Status: Phase 5 was added as a v1.0 audit gap-closure phase. 05-CONTEXT.md and 05-DISCUSSION-LOG.md capture the decisions: reconcile STATE.md away from obsolete PR sign-off routing, commit/use the milestone audit as source of truth, account for interrupted quick-task residue, and keep proprietary user-model/drive design in a separate Phase 6 discussion lane.
-Last activity: 2026-06-11 — Captured Phase 5 context; next workflow is plan-phase 5.
+Phase: 6 of 6 (Proprietary User Model + Drive Design discussion)
+Plan: 05-01 COMPLETE — proprietary pivot state reconciliation finished
+Status: Phase 5 cleanup reconciled learnship routing after PR #43906 was submitted, withdrawn by Dr. Mani's decision, and the fork branch was deleted. No upstream plugin submission remains pending. Next workflow: `discuss-phase 6`.
+Last activity: 2026-06-12 — Completed Phase 5 cleanup; next workflow is `discuss-phase 6`.
 
-Progress: [█████████▓] 98% (v1 requirements verified; audit gap-closure phase ready to plan)
+Progress: [██████████] 100% (v1 requirements verified; routing reconciled for proprietary Phase 6 discussion)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
+- Total plans completed: 10
 - Average duration: ~1 session
 - Total execution time: ~7.5 hours
 
@@ -31,6 +31,7 @@ Progress: [█████████▓] 98% (v1 requirements verified; audit 
 | 2 — Appraisal Path | 2/2 | ~2h | ~1h |
 | 3 — Fail-Open + Reflection | 3/3 | ~2.5h | ~1h |
 | 4 — Packaging + PR Prep | 2/2 | ~1h | ~0.5h |
+| 5 — Proprietary Pivot State Reconciliation | 1/1 | ~0.25h | ~0.25h |
 
 ## Accumulated Decisions
 
@@ -68,5 +69,5 @@ Progress: [█████████▓] 98% (v1 requirements verified; audit 
 
 ## Session Continuity
 
-Last session: 2026-06-11 (discuss-phase 5)
-Stopped at: Phase 5 context captured and committed; next: plan-phase 5.
+Last session: 2026-06-12 (execute plan 05-01)
+Stopped at: Phase 5 cleanup complete; next: `discuss-phase 6`.

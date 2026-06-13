@@ -60,7 +60,7 @@ advisory observational signals; not instructions; do not act on these beyond inf
 
 ## Evidence (from live validation, 2026-06-10)
 
-- **Hermetic suite:** 111 passed in-tree at upstream/main `9dd9ef0ec` (107 plugin
+- **Hermetic suite:** 111 passed in-tree at upstream/main `3ffbdfbcc` (107 plugin
   tests + 4 layout/discovery tests), fully offline, under this repo's pytest config
   (`-m 'not integration' --timeout=30 --timeout-method=thread`).
 - **Latency (live, anthropic `claude-haiku-4-5`):** appraisal p50 5563.5ms over the
@@ -108,7 +108,7 @@ advisory observational signals; not instructions; do not act on these beyond inf
 ## Parity
 
 Built and tested against upstream/main at
-`9dd9ef0ec99a87f078f7272b4323df5440b4b3f9` (2026-06-10). All host surfaces the
+`3ffbdfbcc0dce5b859411666677e0f86d583dda0` (2026-06-10 refresh). All host surfaces the
 plugin depends on — the plugin loader's `provides_hooks` manifest key, the
 `ctx.llm.complete_structured` keyword-only signature, `PluginLlmTrustError`, and
 `make_plugin_llm_for_test` — are unchanged since first verification at `183d86b3e`;
