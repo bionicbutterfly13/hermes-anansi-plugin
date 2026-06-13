@@ -349,7 +349,7 @@ def run_appraisal(*, llm, user_message, conversation_history, snapshot, cfg) -> 
 
 
 # ---------------------------------------------------------------------------
-# Parsing (Anansi shape-discipline: every field optional, coerced, clamped)
+# Parsing (shape-discipline: every field optional, coerced, clamped)
 # ---------------------------------------------------------------------------
 
 

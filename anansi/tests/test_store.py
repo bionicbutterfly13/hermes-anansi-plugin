@@ -112,6 +112,25 @@ def test_round_trip_identical_signals(tmp_path):
     check(store.read_snapshot(db))
 
 
+def test_ensure_db_migrates_legacy_default_state(tmp_path, monkeypatch):
+    legacy = tmp_path / "anansi" / "state.db"
+    new = tmp_path / "anansi" / "state.db"
+    legacy.parent.mkdir(parents=True)
+
+    assert store.ensure_db(legacy) is True
+    assert store.apply_deltas(
+        {"concerns_add": [{"text": "legacy concern"}]}, legacy
+    ) is True
+
+    monkeypatch.setattr(store, "get_db_path", lambda: new)
+    assert store.ensure_db() is True
+    assert new.exists()
+    assert not legacy.exists()
+    snap = store.read_snapshot(new)
+    assert snap is not None
+    assert {c["text"] for c in snap["concerns"]} == {"legacy concern"}
+
+
 def test_absent_db_read_returns_none(tmp_path):
     db = tmp_path / "absent" / "state.db"
     assert store.read_snapshot(db) is None

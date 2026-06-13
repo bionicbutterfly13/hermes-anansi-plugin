@@ -1,4 +1,4 @@
-"""anansi — metacognitive appraisal plugin for hermes-agent.
+"""Anansi — metacognitive appraisal plugin for hermes-agent.
 
 Observational per-turn appraisal with zero autonomy. Phase 2: pre_llm_call
 runs one deadline-bounded JSON appraisal via ctx.llm and injects a compact
@@ -14,7 +14,7 @@ Hard rules for this module (see .planning/research/ARCHITECTURE.md):
 - Every hook accepts the documented kwargs PLUS **kwargs (the dispatcher
   injects extras such as telemetry_schema_version).
 - Every hook is wrapped in the fail-open guard and returns None on any
-  failure. A anansi hook must never raise into the dispatcher.
+  failure. Anansi hooks must never raise into the dispatcher.
 """
 
 import functools
