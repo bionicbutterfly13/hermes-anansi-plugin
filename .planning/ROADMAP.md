@@ -65,7 +65,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 
 **Goal:** Discuss and design the proprietary direction before implementation: layered autobiographical user model, aligned drive/goals, scheduled heartbeat, user-dopamine, worldview, and reconsolidation direction.
 
-**Status:** [x] Complete — design captured (06-CONTEXT.md, 2026-06-14).
+**Status:** [x] Complete — design captured (06-CONTEXT.md, 2026-06-14); adjustable drive-pressure / anti-complacency addendum integrated 2026-06-14.
 
 **Depends on:** Phase 5 cleanup
 
@@ -75,22 +75,23 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 
 **Requirements (proprietary v2 — new IDs):** DRIVE-01, DRIVE-02, DRIVE-03, DRIVE-04, DRIVE-05, DRIVE-06
 
-- **DRIVE-01 — Goal objects:** user-minted goals persisted in new tables in the anansi SQLite store (`store.py`, single sqlite surface); status active/queued/backburner + success criteria. Agent never mints; may surface inert candidate goals that do nothing until the user confirms.
-- **DRIVE-02 — Progress velocity:** per-goal momentum computed from ground truth (git / state timestamps, milestone status) at appraisal-read time (NOT behind debounced reflection); stalled goals weighted louder, moving goals quiet.
-- **DRIVE-03 — In-turn goal-aware appraisal:** appraisal output gains goal-aware noun-fields (relates-to-goal / stalled-N-days / contradicts-milestone), surfaced in-turn via the existing `pre_llm_call` path; no heartbeat this increment.
+- **DRIVE-01 — Goal objects:** user-minted goals persisted in new tables in the anansi SQLite store (`store.py`, single sqlite surface); status active/queued/backburner + success criteria + pressure metadata (`support_style`, `push_when_stalled`, thresholds). Agent never mints; may surface inert candidate goals that do nothing until the user confirms.
+- **DRIVE-02 — Progress velocity:** per-goal momentum computed from ground truth (git / state timestamps, milestone status) at appraisal-read time (NOT behind debounced reflection); stalled goals weighted louder, moving goals quiet; user-authorized push zones raise salience without changing truth/evidence.
+- **DRIVE-03 — In-turn goal-aware appraisal:** appraisal output gains goal-aware noun-fields (relates-to-goal / stalled-N-days / contradicts-milestone) plus inspectable drive-effect fields (neutral read / drive read / salience change + reason), surfaced in-turn via the existing `pre_llm_call` path; no heartbeat this increment.
 - **DRIVE-04 — Drive voice:** first-person owned-want rendering permitted ("I want X ready by Friday"); second-person imperatives still neutralized (SAFE-04 first-person carve-out); pattern-tested.
-- **DRIVE-05 — Never-omit invariant:** user-flagged priorities are never silently dropped from surfaced guidance; enforced and tested (the drive red line; silent omission = betrayal).
-- **DRIVE-06 — Containment:** drive kill switch (separate from the appraisal kill switch) + domain whitelist + energy-budget config keys; all fail-open; drive-off path tested.
+- **DRIVE-05 — Never-omit + anti-complacency invariant:** user-flagged priorities are never silently dropped from surfaced guidance; stalled user-priority goals with authorized pressure cannot be quietly downranked; repeated low-pressure handling flags possible under-support. Enforced and tested.
+- **DRIVE-06 — Containment + adjustability:** drive kill switch (separate from the appraisal kill switch) + domain whitelist + energy-budget + pressure/support-style config keys; all fail-open; drive-off path tested.
 
 **Success criteria:**
 1. A real turn surfaces a user-minted goal with a grounded progress/stalled signal in the appraisal block, in the first-person owned-want voice
 2. Anti-creep tests pass with the first-person carve-out; second-person directives still neutralized
-3. Never-omit test: a flagged priority always appears in surfaced guidance (pattern test green)
+3. Never-omit / anti-complacency tests: a flagged priority always appears in surfaced guidance, and a stalled user-authorized push zone cannot be silently treated as low salience
 4. Drive kill switch off → zero goal-aware fields injected; appraisal otherwise unchanged; full fail-open preserved
 5. Drive state round-trips in the anansi SQLite store (single sqlite surface); locked-DB / corrupt-DB degrade silently
+6. Drive effect is inspectable: neutral read, drive read, and drive-caused salience change are visible enough to audit
 
 **Design source:** `.planning/phases/06-proprietary-user-model-drive-design/06-CONTEXT.md`
-**Status:** [ ] Not started — run `plan-phase 7`
+**Status:** [~] Planned, not executed — 07-01..07-04 exist; next workflow is `execute-phase 7`
 **Depends on:** Phase 6 (design)
 
 ## Coverage

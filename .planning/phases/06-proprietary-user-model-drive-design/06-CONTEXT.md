@@ -2,7 +2,7 @@
 
 **Gathered:** 2026-06-14
 **Mode:** standard
-**Status:** Ready for planning
+**Status:** Complete — addendum integrated 2026-06-14
 
 <domain>
 ## Phase Boundary
@@ -59,6 +59,23 @@ bounded by the decisions below.
   only in user-named domains); (3) a per-heartbeat energy/attention budget (costed-actions model,
   hard cap per wakeup). A desktop config panel tunes all three later.
 
+### Autonomy boundary — Adjustable pressure + drive consequence visibility
+- Drive pressure is adjustable, not hidden inside the model's private judgment. The first in-turn
+  implementation exposes a bounded pressure ladder (`quiet` / `standard` / `firm`); `code-red`
+  remains deferred to the heartbeat/interruption planning lane and still requires user-defined
+  objective triggers.
+- The drive may adjust salience, urgency, persistence, and surfacing priority. It may NOT adjust
+  truth, goal ownership, evidence, or omission rules. Any drive-caused salience change must be
+  inspectable as a drive effect rather than blended into the neutral read.
+- Surfacing must make the consequence of drive visible: neutral read, drive read, and drive effect
+  (for example, "raised salience because goal X is stalled 5 days and marked firm support"). The
+  user should be able to see how the drive changed the appraisal.
+- Anti-complacency is part of safety, not a relaxation of it. User-authorized push zones
+  (`support_style`, `push_when_stalled`, and threshold metadata) prevent high-priority stalled goals
+  from being quietly downranked when the user most needs support. Repeated low-pressure handling of
+  a stalled user-priority should flag itself as possible under-support, not disappear behind
+  caution.
+
 ### The never-omit invariant (drive red line)
 - The agent's guesses must never outrank the user's stated goals/priorities, and it must NEVER
   silently drop something the user flagged as mattering. Stated priorities stay surfaced/visible even
@@ -90,7 +107,9 @@ bounded by the decisions below.
 ### Agent's Discretion
 - Exact table schemas for goals + progress velocity, and the progress-velocity metric formula →
   plan-phase.
-- Exact config keys/shape for the three containment controls → plan-phase.
+- Exact config keys/shape for the containment and pressure controls → plan-phase.
+- Exact rendering shape for neutral read / drive read / drive effect → plan-phase, but it must keep
+  the drive consequence visible and must not collapse pressure into unstated model judgment.
 
 </decisions>
 
@@ -101,6 +120,11 @@ bounded by the decisions below.
   agent's own first-person wants. (DESIGN-REWIND #1.)
 - Progress velocity replaces agent-dopamine for goals: per-goal momentum; stalled goals louder,
   moving goals quiet; inspectable.
+- Calibrated pressure replaces global pressure: per-goal support style and push thresholds let the
+  user authorize stronger momentum support locally without giving the agent global permission to
+  pressure.
+- Drive consequence visibility: the rendered/appraisal surface should show when drive raised,
+  lowered, or preserved salience, and why.
 - User-dopamine (later increment) models the USER's motivation/habit dynamics, bounded to whitelisted
   domains and override-able — never an agent-reward signal.
 - Worldview-as-data and reconsolidation (belief-flip propagation) are the high-novelty later
@@ -145,12 +169,16 @@ bounded by the decisions below.
   between-session/heartbeat work must follow.
 - Fail-open everywhere; advisory-only signals (never branch on a guess) — the never-omit invariant
   extends this stance.
+- Drive pressure is explicit metadata, not hidden reward shaping. Later agents must keep neutral read
+  and drive-adjusted read separable enough to audit.
 
 ### Integration Points
 - Goal-aware noun-fields added to the appraisal output schema, surfaced through render with the
   first-person want carve-out.
 - New goal/velocity tables in `store.py`, read at appraisal time, written by reflection / (future)
   heartbeat.
+- Pressure metadata (`support_style`, `push_when_stalled`, thresholds) rides with goal state. Drive
+  effect fields ride with appraisal/render output so a user can inspect how salience changed.
 
 </code_context>
 
@@ -163,6 +191,8 @@ bounded by the decisions below.
   cold-respawn defect fix.
 - "Code red" urgency-interruption lane — open question, user-defined triggers only; decided at
   heartbeat-increment planning (see Surfacing decision).
+- Full under-response audit across multiple sessions — later heartbeat/user-model increment if it
+  needs between-session history. Phase 7 owns the first in-turn anti-complacency signal.
 - Worldview store, episode/autobiography, user-dopamine, reconsolidation — later increments per the
   working order.
 - Desktop config panel for tuning cadence / budgets / domains.
