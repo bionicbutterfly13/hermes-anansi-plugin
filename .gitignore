@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 .devtools/
+graphify-out/
+.serena/
+drafts/
