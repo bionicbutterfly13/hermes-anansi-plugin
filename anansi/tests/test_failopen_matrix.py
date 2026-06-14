@@ -43,6 +43,11 @@ written pre-call by design; see reflection.py's module docstring).
 | velocity: absent .git (DRIVE-02)          | ::test_velocity_absent_git_block_still_renders                                                               | implemented   |
 | velocity: unparseable reflog (DRIVE-02)   | ::test_velocity_unparseable_reflog_fails_open                                                                | implemented   |
 | velocity: bad timestamp (DRIVE-02)        | ::test_velocity_bad_timestamp_fails_open                                                                     | implemented   |
+| drive kill switch off (DRIVE-06)          | ::test_drive_disabled_appraisal_unchanged, ::test_drive_disabled_is_non_failure                             | implemented   |
+| locked-DB goal write (DRIVE-01)           | test_drive_store.py::test_locked_db_goal_write_returns_false                                                 | referenced    |
+| malformed drive config coerced (DRIVE-06) | ::test_missing_config_malformed_drive_values_coerced                                                         | implemented   |
+| domain whitelist suppression (DRIVE-06)   | ::test_drive_whitelist_suppression_full_hook                                                                 | implemented   |
+| energy budget cap (DRIVE-06)              | ::test_drive_budget_cap_full_hook (flagged exempt — DRIVE-05 > DRIVE-06)                                     | implemented   |
 
 Lock-semantics note (verified 2026-06-10 against sqlite3 under the hermes
 venv): in WAL mode — the production arrangement, set at DB creation — a held
@@ -502,6 +507,94 @@ def test_velocity_bad_timestamp_fails_open(pinned_env, monkeypatch):
         session_id="s1", user_message="how is the drive layer going?"
     )
     assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
+
+
+# ---------------------------------------------------------------------------
+# DRIVE-06 containment: the domain whitelist + the per-turn energy budget, both
+# through the FULL registered pre_llm_call hook. A whitelist drops off-domain
+# goals from the surfaced block; the budget caps NON-flagged drive lines while a
+# flagged-priority want stays (never-omit beats the budget). Both fail open: the
+# hook always returns a normal block and records a single ok row.
+# ---------------------------------------------------------------------------
+
+
+def _seed_domain_goals(db_path):
+    """A proj-a goal and a proj-b goal (both active, both with momentum
+    available at read time)."""
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {"text": "ship proj-a feature", "status": "active",
+                 "success_criteria": "done", "domain": "proj-a"},
+                {"text": "ship proj-b feature", "status": "active",
+                 "success_criteria": "done", "domain": "proj-b"},
+            ]
+        },
+        db_path,
+    ) is True
+
+
+def test_drive_whitelist_suppression_full_hook(pinned_env):
+    """Whitelist set to ['proj-a'] with an off-domain proj-b goal in the tmp DB:
+    the hook returns a normal block; the off-domain goal never reaches the model
+    context, and the hook never raises (single ok row). A faithful model only
+    sees whitelisted goals, so no proj-b drive line can surface."""
+    _seed_domain_goals(pinned_env.db_path)
+    # The fake model echoes a goal_signal for proj-b — but proj-b was filtered
+    # out before appraisal, so enrich finds no match and the block stays normal.
+    payload = dict(RICH_PAYLOAD)
+    payload["goal_signals"] = [
+        {"relates_to_goal": "ship proj-b feature", "confidence": 0.9}
+    ]
+    pinned_env.state["cfg"] = _cfg(drive_enabled=True, drive_domains=["proj-a"])
+    pinned_env.state["caller"] = _CountingCaller(payload)
+
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is proj-a going?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    # proj-b was suppressed before the model ever saw it; never raises.
+    assert "ship proj-b feature" not in out["context"]
+    assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
+
+
+def test_drive_budget_cap_full_hook(pinned_env):
+    """drive_energy_budget=1 with multiple non-flagged goal_signals: at most one
+    `- drive note:` line surfaces in the returned block; a flagged goal (seeded
+    in the DB) still appears as a `- drive want:` line — never-omit beats the
+    budget (DRIVE-05 > DRIVE-06). The hook never raises (single ok row)."""
+    # One flagged goal + the budget=1 cap applied to the model's non-flagged
+    # goal_signals.
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {"text": "land the launch", "status": "active",
+                 "success_criteria": "shipped", "flagged_priority": 1,
+                 "domain": "launch"},
+            ]
+        },
+        pinned_env.db_path,
+    ) is True
+    payload = dict(RICH_PAYLOAD)
+    payload["goal_signals"] = [
+        {"relates_to_goal": "side quest one", "confidence": 0.8},
+        {"relates_to_goal": "side quest two", "confidence": 0.8},
+        {"relates_to_goal": "side quest three", "confidence": 0.8},
+    ]
+    pinned_env.state["cfg"] = _cfg(drive_enabled=True, drive_energy_budget=1)
+    pinned_env.state["caller"] = _CountingCaller(payload)
+
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is the launch going?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    block = out["context"]
+    note_lines = [ln for ln in block.split("\n") if ln.startswith("- drive note:")]
+    want_lines = [ln for ln in block.split("\n") if ln.startswith("- drive want:")]
+    assert len(note_lines) <= 1  # budget capped the non-flagged notes
+    assert len(want_lines) == 1  # the flagged priority survived the budget
+    assert "land the launch" in want_lines[0]
     assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
 
 

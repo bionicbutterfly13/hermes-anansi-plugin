@@ -52,6 +52,36 @@ def _filter_goals_by_domain(goals, drive_domains):
         return goals
 
 
+def _filter_signals_by_goals(goal_signals, goals, drive_domains):
+    """DRIVE-06 containment: when the domain whitelist is ACTIVE, drop any model
+    ``goal_signals`` that do not relate to a surviving (whitelisted) persisted
+    goal. This stops an off-domain goal the model echoed from leaking into the
+    surfaced goal-aware fields even though it was filtered out of the appraisal
+    context. An EMPTY whitelist leaves the signals untouched (07-01..03
+    behaviour unchanged). Fail-open: any failure returns the unfiltered signals.
+    """
+    try:
+        if not drive_domains or not goal_signals:
+            return goal_signals
+        texts = [
+            str(g.get("text") or "").strip().lower()
+            for g in (goals or [])
+            if isinstance(g, dict) and str(g.get("text") or "").strip()
+        ]
+        if not texts:
+            return []  # whitelist active but no whitelisted goal -> none surface
+        kept = []
+        for sig in goal_signals:
+            if not isinstance(sig, dict):
+                continue
+            relates = str(sig.get("relates_to_goal") or "").strip().lower()
+            if relates and any(relates in t or t in relates for t in texts):
+                kept.append(sig)
+        return kept
+    except Exception:
+        return goal_signals
+
+
 def _fail_open(fn):
     """Wrap a hook so any exception is logged and swallowed (returns None).
 
@@ -199,8 +229,15 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
     # metadata) so the stalled signal is anchored to ground truth — render
     # then orders stalled goals first. Pure + fail-open; no-op when no goals.
     elif drive_on and result.signals.get("goal_signals"):
+        # DRIVE-06: when the domain whitelist is active, drop any echoed
+        # goal_signal that does not relate to a surviving (whitelisted)
+        # persisted goal — an off-domain goal must not leak back through the
+        # model's echo. No-op when the whitelist is empty (default).
+        gsignals = _filter_signals_by_goals(
+            result.signals["goal_signals"], goals, cfg.get("drive_domains") or []
+        )
         result.signals["goal_signals"] = render.enrich_goal_signals(
-            result.signals["goal_signals"], goals
+            gsignals, goals
         )
     # snapshot rides along for REFL-05 trust hints (advisory only; empty-
     # signal suppression inside render_block still takes precedence).
