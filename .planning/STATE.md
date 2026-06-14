@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-06-10)
 
 **Core value:** Every Hermes turn gets a grounded metacognitive appraisal injected before response generation; after PR #43906 was withdrawn, the plugin is proprietary and v1 remains the foundation.
-**Current focus:** Phase 6 — Proprietary User Model + Drive Design discussion
+**Current focus:** Phase 6 design discussion COMPLETE; next is plan-phase 6 (first increment: Drive/accountability)
 
 ## Current Position
 
-Phase: 6 of 6 (Proprietary User Model + Drive Design discussion)
-Plan: 05-01 COMPLETE — proprietary pivot state reconciliation finished
-Status: Phase 5 cleanup reconciled learnship routing after PR #43906 was submitted, withdrawn by Dr. Mani's decision, and the fork branch was deleted. No upstream plugin submission remains pending. Next workflow: `discuss-phase 6`.
-Last activity: 2026-06-12 — Completed Phase 5 cleanup; next workflow is `discuss-phase 6`.
+Phase: 6 of 6 (Proprietary User Model + Drive Design)
+Plan: 06-CONTEXT captured — Phase 6 design decisions locked (autonomy boundary, scope/sequencing, architecture)
+Status: discuss-phase 6 COMPLETE. First increment = Drive/accountability (user-minted goals + progress velocity + in-turn goal-aware appraisal; never-omit invariant). Drive state extends the anansi SQLite store; heartbeat deferred to the increment that needs it; code-red interruption deferred to heartbeat planning. Next workflow: `plan-phase 6`.
+Last activity: 2026-06-14 — Completed discuss-phase 6; next workflow is `plan-phase 6`.
 
-Progress: [██████████] 100% (v1 requirements verified; routing reconciled for proprietary Phase 6 discussion)
+Progress: [██████████] 100% v1; Phase 6 design captured — ready to plan the proprietary first increment
 
 ## Performance Metrics
 
@@ -57,6 +57,9 @@ Progress: [██████████] 100% (v1 requirements verified; routi
 | PKG-01 manifest test asserts set equality between provides_hooks and AST-collected register_hook names | 4 | Catches both undeclared registrations and stale manifest entries (04-01) |
 | In-tree tests are a package (`tests.plugins.anansi.*`); plugin loads as module `anansi` via conftest spec-load, never `plugins.anansi` | 4 | Three-module-identity trap avoided; worktree root force-inserted at sys.path[0] shadows the editable install (04-02) |
 | .devtools/pytest staged at upstream pins (pytest 9.0.2, pytest-timeout 2.4.0, pytest-asyncio 1.3.0) | 4 | Worktree runs need upstream's addopts (--timeout); plugin-repo suite re-verified green under the pins (04-02) |
+| Phase 6 first increment = Drive/accountability; drive state extends anansi SQLite store (store.py) | 6 | discuss-phase 6 / 06-CONTEXT; single sqlite surface preserved |
+| Never-omit invariant: agent guesses never outrank stated priorities; never silently drop a flagged item | 6 | Core drive red line; silent omission = betrayal (Dr. Mani top anti-value) |
+| Drive surfacing in-turn only (no proactive push); heartbeat + code-red interruption deferred | 6 | Extends one-turn-lag idiom; fail-open preserved; code-red needs user-defined triggers only |
 
 ## Blockers / Concerns
 
@@ -69,5 +72,5 @@ Progress: [██████████] 100% (v1 requirements verified; routi
 
 ## Session Continuity
 
-Last session: 2026-06-12 (execute plan 05-01)
-Stopped at: Phase 5 cleanup complete; next: `discuss-phase 6`.
+Last session: 2026-06-14 (discuss-phase 6)
+Stopped at: Phase 6 design captured (06-CONTEXT.md); next: `plan-phase 6`.
