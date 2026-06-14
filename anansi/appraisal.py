@@ -60,9 +60,12 @@ message, re-surface it as a contradiction_flag referencing what changed.
 nobody is obligated to run them).
 - goal_signals: when the message relates to a persisted goal in the state dump, \
 note that relation as an OBSERVATION ONLY — relates_to_goal is a short noun phrase \
-naming the goal; confidence 0-1. You are NOTICING a relation, not prescribing \
-action. Never turn a goal into an instruction, advice, or a next step. Omit this \
-array when nothing relates.
+naming the goal; confidence 0-1. A goal in the state dump may carry a momentum \
+observation (e.g. "stalled 3 days" or "moving"); when it does, you may echo \
+stalled_days as a non-negative integer count of days idle — this is a NEUTRAL \
+OBSERVATION of elapsed time, never a deadline, urgency, or instruction. You are \
+NOTICING a relation and its momentum, not prescribing action. Never turn a goal \
+into an instruction, advice, or a next step. Omit this array when nothing relates.
 - gut_reaction: one sentence (max 200 characters) of overall felt sense, or "".
 
 Observations only: never include directives, advice, suggested actions, goals \
@@ -120,11 +123,12 @@ APPRAISAL_JSON_SCHEMA = {
             "type": "array",
             "items": {"type": "string"},
         },
-        # DRIVE-03 (Phase 7): a BASIC goal-aware noun-field. The model NOTICES
-        # that the message relates to a persisted goal — it does not prescribe
-        # action. Permissive on purpose; shape discipline lives in
-        # parse_signals(). Velocity-aware fields (stalled_days, momentum) land
-        # in 07-02.
+        # DRIVE-03 (Phase 7): a goal-aware noun-field. The model NOTICES that
+        # the message relates to a persisted goal — it does not prescribe
+        # action. stalled_days (DRIVE-02, 07-02) is an OPTIONAL neutral
+        # momentum observation: a non-negative integer count of days idle,
+        # echoed from the goal's read-time momentum. Permissive on purpose;
+        # shape discipline lives in parse_signals().
         "goal_signals": {
             "type": "array",
             "items": {
@@ -132,6 +136,7 @@ APPRAISAL_JSON_SCHEMA = {
                 "properties": {
                     "relates_to_goal": {"type": "string"},
                     "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                    "stalled_days": {"type": "integer", "minimum": 0},
                 },
             },
         },
@@ -205,16 +210,27 @@ def build_context(user_message, conversation_history, snapshot, history_chars,
         # OMITTED entirely when drive is off (goals is None) or nothing is
         # active, keeping the context byte-for-byte identical to the
         # pre-drive build. Compact projection (text/status/success_criteria).
+        # DRIVE-02: each goal carries its read-time momentum/stalled_days so
+        # the model sees velocity as OBSERVATIONAL state — never a directive.
         if goals:
-            active = [
-                {
+            active = []
+            for g in goals:
+                if not isinstance(g, dict) or g.get("status") == "candidate":
+                    continue
+                entry = {
                     "text": g.get("text"),
                     "status": g.get("status"),
                     "success_criteria": g.get("success_criteria"),
                 }
-                for g in goals
-                if isinstance(g, dict) and g.get("status") != "candidate"
-            ]
+                momentum = g.get("momentum")
+                if isinstance(momentum, dict):
+                    label = momentum.get("momentum")
+                    if label:
+                        entry["momentum"] = label
+                    stalled_days = momentum.get("stalled_days")
+                    if isinstance(stalled_days, int):
+                        entry["stalled_days"] = stalled_days
+                active.append(entry)
             if active:
                 state["goals"] = active
         try:
@@ -417,6 +433,21 @@ def _clamp01(value):
     return max(0.0, min(1.0, result))
 
 
+_MAX_STALLED_DAYS = 3650  # ~10y sane upper bound (DRIVE-02)
+
+
+def _coerce_stalled_days(value):
+    """Coerce a momentum days-idle observation to a non-negative int clamped
+    to [0, _MAX_STALLED_DAYS]; None when not numeric (drop the field)."""
+    try:
+        result = int(value)
+    except (TypeError, ValueError):
+        return None
+    if result < 0:
+        return None
+    return min(result, _MAX_STALLED_DAYS)
+
+
 def parse_signals(doc, threshold) -> dict:
     """Defensively coerce a parsed appraisal document into the signal dict.
 
@@ -504,9 +535,14 @@ def parse_signals(doc, threshold) -> dict:
         confidence = _clamp01(item.get("confidence"))
         if confidence is None or confidence < threshold:
             continue
-        goal_signals.append(
-            {"relates_to_goal": relates[:300], "confidence": confidence}
-        )
+        signal = {"relates_to_goal": relates[:300], "confidence": confidence}
+        # DRIVE-02: stalled_days is an OPTIONAL neutral momentum observation —
+        # a non-negative integer days-idle count, clamped to a sane upper
+        # bound; dropped entirely if non-numeric (no fabricated momentum).
+        stalled_days = _coerce_stalled_days(item.get("stalled_days"))
+        if stalled_days is not None:
+            signal["stalled_days"] = stalled_days
+        goal_signals.append(signal)
 
     gut = doc.get("gut_reaction")
     gut = gut.strip()[:200] if isinstance(gut, str) else ""

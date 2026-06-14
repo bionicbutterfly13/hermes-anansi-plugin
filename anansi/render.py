@@ -122,6 +122,130 @@ _TRUST_HINT_THRESHOLD = 0.4
 _MAX_TRUST_HINTS = 2
 
 
+# DRIVE-02: neutral momentum salience (stalled LOUDER than moving than
+# unknown) — ORDERING only, never imperative loudness. Pressure metadata may
+# ADD to a goal's salience for ordering, but the neutral momentum read stays
+# separate and inspectable (the stalled-days clause is unchanged; the drive
+# effect renders as its own "[push]" reason clause).
+_MOMENTUM_RANK = {"stalled": 2, "moving": 1, "unknown": 0}
+# A user-authorized push zone for a stalled goal raises ITS ordering rank
+# above an unauthorized stalled goal — a visible drive effect, kept separate
+# from the neutral stalled rank above.
+_PUSH_SALIENCE_BONUS = 10
+
+
+def _drive_salience(item) -> float:
+    """Neutral momentum salience PLUS any user-authorized pressure bonus —
+    used ONLY for ordering. The neutral read is recoverable from the
+    stalled_days field (unchanged); the bonus is recoverable from the
+    push metadata, so the two effects remain inspectable/separate."""
+    if not isinstance(item, dict):
+        return 0.0
+    stalled_days = item.get("stalled_days")
+    momentum = "stalled" if isinstance(stalled_days, int) else item.get("momentum")
+    rank = _MOMENTUM_RANK.get(momentum, 0)
+    bonus = 0
+    if rank >= _MOMENTUM_RANK["stalled"] and _push_when_stalled(item):
+        bonus = _PUSH_SALIENCE_BONUS
+    try:
+        confidence = float(item.get("confidence") or 0.0)
+    except (TypeError, ValueError):
+        confidence = 0.0
+    # rank dominates; the push bonus dominates within-rank; confidence breaks
+    # remaining ties.
+    return rank + bonus + min(max(confidence, 0.0), 1.0)
+
+
+def _push_when_stalled(item) -> bool:
+    """True when the goal_signals item carries user-authorized firmer-support
+    metadata for a stalled goal (DRIVE anti-complacency, 07-RESEARCH Pitfall
+    #9). Defensive: any non-truthy/absent value reads as no push."""
+    if not isinstance(item, dict):
+        return False
+    if item.get("push_when_stalled"):
+        return True
+    style = str(item.get("support_style", "") or "").strip().lower()
+    return style in ("firm", "push", "firmer")
+
+
+def enrich_goal_signals(goal_signals, goals):
+    """Ground each parsed goal_signal in the matching persisted goal's
+    READ-TIME momentum (DRIVE-02) so the stalled signal is anchored to ground
+    truth, not solely to whether the model echoed stalled_days.
+
+    For each signal, find a persisted goal whose text matches relates_to_goal
+    (case-insensitive substring either direction) and, when that goal reads
+    'stalled', attach its neutral stalled_days plus any user-authorized
+    pressure metadata (support_style/push_when_stalled). The neutral momentum
+    and the pressure effect stay as SEPARATE inspectable fields. Pure,
+    defensive, never raises — returns the (possibly enriched) list.
+    """
+    try:
+        signals = [g for g in (goal_signals or []) if isinstance(g, dict)]
+        goal_list = [g for g in (goals or []) if isinstance(g, dict)]
+        if not signals or not goal_list:
+            return signals
+        for sig in signals:
+            relates = str(sig.get("relates_to_goal", "") or "").strip().lower()
+            if not relates:
+                continue
+            match = None
+            for goal in goal_list:
+                text = str(goal.get("text", "") or "").strip().lower()
+                if text and (text in relates or relates in text):
+                    match = goal
+                    break
+            if match is None:
+                continue
+            momentum = match.get("momentum")
+            if not isinstance(momentum, dict):
+                continue
+            sig["momentum"] = momentum.get("momentum")
+            days = momentum.get("stalled_days")
+            # Only attach the neutral stalled_days when the goal actually reads
+            # stalled (moving/unknown carry no days clause). Don't overwrite a
+            # model-supplied value with None.
+            if isinstance(days, int) and "stalled_days" not in sig:
+                sig["stalled_days"] = days
+            # User-authorized pressure metadata (kept separate from the
+            # neutral momentum above) — copied through for ordering + the
+            # inspectable drive-effect clause.
+            if match.get("support_style") is not None:
+                sig["support_style"] = match.get("support_style")
+            if match.get("push_when_stalled") is not None:
+                sig["push_when_stalled"] = match.get("push_when_stalled")
+        return signals
+    except Exception:
+        return [g for g in (goal_signals or []) if isinstance(g, dict)]
+
+
+def _order_goal_signals(goal_signals):
+    """Stable descending order by drive salience: stalled (then user-pushed
+    stalled) first, moving next, unknown last. Stable so equal-salience
+    signals keep their input order."""
+    items = [g for g in (goal_signals or []) if isinstance(g, dict)]
+    return sorted(items, key=_drive_salience, reverse=True)
+
+
+def _render_drive_note(item) -> str:
+    """One observational, THIRD-PERSON drive note. Includes the neutral
+    "stalled N days" clause when present, and — SEPARATELY — a "[push]" drive
+    effect clause when user-authorized pressure raised this goal's salience
+    (the neutral read and the drive effect stay inspectable, 07-RESEARCH
+    Pitfall #9). Never imperative."""
+    relates = _sanitize_text(item.get("relates_to_goal", ""), 300)
+    stalled_days = item.get("stalled_days")
+    parts = ["relates to %s" % relates]
+    if isinstance(stalled_days, int):
+        parts.append("stalled %d days" % stalled_days)
+        if _push_when_stalled(item):
+            # The drive effect, rendered SEPARATELY so it is inspectable —
+            # observational tag, not an instruction.
+            parts.append("[push zone: user-authorized firmer support]")
+    parts.append("(confidence %s)" % _fmt(item.get("confidence")))
+    return "- drive note: " + " — ".join(parts[:-1]) + " " + parts[-1]
+
+
 def render_block(signals, snapshot=None) -> Optional[str]:
     """Render the sanitized [anansi appraisal] block, or None (APPR-04/05).
 
@@ -176,17 +300,16 @@ def render_block(signals, snapshot=None) -> Optional[str]:
                 _fmt(item.get("confidence")),
             )
         )
-    # DRIVE-03: observational goal-relation notes. THIRD-PERSON only — the
-    # first-person "- drive want:" voice lands in 07-03. Sanitized like every
-    # interpolated field; participates in the existing token cap.
-    for item in goal_signals[:3]:
-        lines.append(
-            "- drive note: relates to %s (confidence %s)"
-            % (
-                _sanitize_text(item.get("relates_to_goal", ""), 300),
-                _fmt(item.get("confidence")),
-            )
-        )
+    # DRIVE-02/03: observational goal-relation notes, ordered LOUDEST-FIRST.
+    # "Louder" is SALIENCE/ORDERING, never imperative language (SAFE-04 +
+    # reactance research, 07-RESEARCH external note): a stalled goal renders
+    # BEFORE a moving one. THIRD-PERSON only — the first-person "- drive want:"
+    # voice lands in 07-03. The stalled-days clause is a neutral elapsed-time
+    # observation; pressure (support_style/push_when_stalled) may raise a
+    # goal's salience but the neutral stalled-days observation stays intact and
+    # the drive effect is rendered as a separate, inspectable clause.
+    for item in _order_goal_signals(goal_signals)[:3]:
+        lines.append(_render_drive_note(item))
     if searches:
         quoted = "; ".join(
             "'%s'" % _sanitize_text(s, 100) for s in searches[:3]

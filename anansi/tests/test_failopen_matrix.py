@@ -40,6 +40,9 @@ written pre-call by design; see reflection.py's module docstring).
 | on_session_end: no DB + no ctx            | ::test_on_session_end_no_db_no_ctx_returns_none                                                              | implemented   |
 | on_session_end: exploding reflection LLM  | ::test_on_session_end_exploding_llm_fails_open                                                               | implemented   |
 | post_llm_call: locked DB                  | ::test_post_llm_call_locked_db_returns_none                                                                  | implemented   |
+| velocity: absent .git (DRIVE-02)          | ::test_velocity_absent_git_block_still_renders                                                               | implemented   |
+| velocity: unparseable reflog (DRIVE-02)   | ::test_velocity_unparseable_reflog_fails_open                                                                | implemented   |
+| velocity: bad timestamp (DRIVE-02)        | ::test_velocity_bad_timestamp_fails_open                                                                     | implemented   |
 
 Lock-semantics note (verified 2026-06-10 against sqlite3 under the hermes
 venv): in WAL mode — the production arrangement, set at DB creation — a held
@@ -406,6 +409,71 @@ def test_drive_disabled_is_non_failure(pinned_env):
     assert summary is not None
     assert summary["failure_count"] == 0  # drive-disabled is a non-failure
     assert summary["by_outcome"].get("skipped:drive_disabled") == 1
+
+
+# ---------------------------------------------------------------------------
+# DRIVE-02: read-time velocity fail-open rows (07-02). Absent/corrupt .git,
+# an unparseable reflog, and a bad timestamp ALL degrade to 'unknown'
+# momentum — the hook still returns its normal block (or suppresses), never
+# raises, telemetry stays sane.
+# ---------------------------------------------------------------------------
+
+
+def test_velocity_absent_git_block_still_renders(pinned_env, monkeypatch):
+    """Drive on, goals-bearing DB, repo-root resolves to a dir with NO .git
+    ⇒ momentum 'unknown'; the hook still returns a normal block, never
+    raises, and records a single ok row."""
+    _seed_goals(pinned_env.db_path)
+    pinned_env.state["cfg"] = _cfg(drive_enabled=True)
+    pinned_env.state["caller"] = _CountingCaller(RICH_PAYLOAD)
+    # A repo root with no .git -> _last_commit_epoch returns None -> unknown.
+    monkeypatch.setattr(store, "_repo_root", lambda start=None: None)
+
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is the drive layer going?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
+
+
+def test_velocity_unparseable_reflog_fails_open(pinned_env, monkeypatch):
+    """The reflog parse raising/garbage ⇒ momentum 'unknown'; the hook still
+    returns normally, no raise."""
+    _seed_goals(pinned_env.db_path)
+    pinned_env.state["cfg"] = _cfg(drive_enabled=True)
+    pinned_env.state["caller"] = _CountingCaller(RICH_PAYLOAD)
+
+    def _boom(repo_root):
+        raise RuntimeError("garbage reflog")
+
+    monkeypatch.setattr(store, "_last_commit_epoch", _boom)
+
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is the drive layer going?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
+
+
+def test_velocity_bad_timestamp_fails_open(pinned_env, monkeypatch):
+    """A goal whose momentum computation hits a bad timestamp degrades to the
+    benign default; the hook is unaffected."""
+    _seed_goals(pinned_env.db_path)
+    pinned_env.state["cfg"] = _cfg(drive_enabled=True)
+    pinned_env.state["caller"] = _CountingCaller(RICH_PAYLOAD)
+
+    def _bad(goal, repo_root=None, now=None):
+        # Simulate a velocity path that hits an unparseable timestamp and
+        # returns the benign default rather than raising.
+        return store._momentum_default()
+
+    monkeypatch.setattr(store, "goal_momentum", _bad)
+
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is the drive layer going?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
 
 
 # ---------------------------------------------------------------------------

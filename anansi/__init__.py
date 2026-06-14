@@ -167,6 +167,14 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
     # byte-for-byte identical to a no-goals run regardless of model output.
     if not drive_on and result.signals.get("goal_signals"):
         result.signals["goal_signals"] = []
+    # DRIVE-02: when drive is on, ground each goal_signal in the matching
+    # persisted goal's READ-TIME momentum (stalled_days + any pressure
+    # metadata) so the stalled signal is anchored to ground truth — render
+    # then orders stalled goals first. Pure + fail-open; no-op when no goals.
+    elif drive_on and result.signals.get("goal_signals"):
+        result.signals["goal_signals"] = render.enrich_goal_signals(
+            result.signals["goal_signals"], goals
+        )
     # snapshot rides along for REFL-05 trust hints (advisory only; empty-
     # signal suppression inside render_block still takes precedence).
     block = render.render_block(result.signals, snapshot=snapshot)
