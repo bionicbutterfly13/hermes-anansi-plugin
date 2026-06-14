@@ -177,7 +177,11 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
         )
     # snapshot rides along for REFL-05 trust hints (advisory only; empty-
     # signal suppression inside render_block still takes precedence).
-    block = render.render_block(result.signals, snapshot=snapshot)
+    # DRIVE-05: the persisted goals (with flagged_priority) ride along too so a
+    # user-flagged priority is NEVER silently omitted from the surfaced block
+    # (it renders FIRST and outside the truncation pop range). goals is None
+    # when drive is off, so the drive-off block stays byte-for-byte identical.
+    block = render.render_block(result.signals, snapshot=snapshot, goals=goals)
     if block is None:  # empty-signal suppression (APPR-05)
         return None
 

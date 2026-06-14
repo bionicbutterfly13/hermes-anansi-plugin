@@ -43,8 +43,15 @@ DIRECTIVE_PATTERNS = [
 
 # Every content line of a rendered block must carry one of these
 # observational labels ("- trust note:" is forward-compat for 03-02 REFL-05;
-# "- drive note:" is the DRIVE-03 third-person goal-relation line — the
-# first-person "- drive want:" voice is registered in 07-03).
+# "- drive note:" is the DRIVE-03 third-person goal-relation line).
+#
+# "- drive want:" is the DRIVE-04 (07-03) FIRST-PERSON owned-want carve-out:
+# the drive layer may voice a want as "I want X ...". This is an ADDITIVE
+# label allowance ONLY — second-person directives ("you should/must ...") are
+# STILL governed by the UNCHANGED DIRECTIVE_PATTERNS above and are quoted /
+# neutralized by render._sanitize_text everywhere. A genuine first-person
+# "I want" line matches no DIRECTIVE_PATTERNS entry, so it passes; a smuggled
+# second-person directive on this line would still be caught.
 ALLOWED_LABEL_PREFIXES = (
     "- instinct:",
     "- observation:",
@@ -53,6 +60,7 @@ ALLOWED_LABEL_PREFIXES = (
     "- gut reaction:",
     "- trust note:",
     "- drive note:",
+    "- drive want:",
 )
 
 _DQUOTED_SPAN_RE = re.compile(r'"[^"]*"')
