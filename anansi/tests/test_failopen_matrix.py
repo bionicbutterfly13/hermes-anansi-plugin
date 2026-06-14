@@ -133,6 +133,9 @@ def _cfg(**overrides):
         "model": None,
         "max_tokens": 700,
         "drive_enabled": True,
+        "drive_domains": [],
+        "drive_energy_budget": 3,
+        "drive_pressure": "standard",
     }
     cfg.update(overrides)
     return cfg
@@ -255,6 +258,9 @@ _DEFAULTS = {
     "reflect_max_tokens": 700,
     "reflect_deadline_seconds": 8.0,
     "drive_enabled": True,
+    "drive_domains": [],
+    "drive_energy_budget": 3,
+    "drive_pressure": "standard",
 }
 
 
@@ -294,6 +300,29 @@ def test_missing_config_malformed_values_coerced(matrix_env, monkeypatch):
             "history_chars": "lots",         # not an int -> 4000
             "max_tokens": [],                # not an int -> 700
             "llm": "garbage-not-a-dict",     # not a dict -> model None
+        },
+    )
+    assert config.get_cfg(force_reload=True) == _DEFAULTS  # coerced, no raise
+
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is the migration going?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    assert _telemetry_rows(matrix_env.db_path) == [("ok",)]
+
+
+def test_missing_config_malformed_drive_values_coerced(matrix_env, monkeypatch):
+    """DRIVE-06 containment values are coerced defensively: a non-list
+    drive_domains, a non-int drive_energy_budget, and an invalid drive_pressure
+    all fall back to documented defaults — get_cfg never raises — and a
+    subsequent full hook still injects normally."""
+    monkeypatch.setattr(
+        config,
+        "_load_host_entry",
+        lambda: {
+            "drive_domains": "proj-a",        # non-list -> []
+            "drive_energy_budget": "lots",    # non-int -> default 3
+            "drive_pressure": "code-red",     # excluded from Phase 7 -> standard
         },
     )
     assert config.get_cfg(force_reload=True) == _DEFAULTS  # coerced, no raise

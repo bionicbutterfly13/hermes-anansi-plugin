@@ -31,6 +31,27 @@ _ctx = None
 _session_state = {"session_id": None, "last_msg_norm": None}
 
 
+def _filter_goals_by_domain(goals, drive_domains):
+    """DRIVE-06 containment: keep only goals whose ``domain`` is in the
+    whitelist when the whitelist is NON-empty; an empty whitelist means NO
+    restriction (07-01..03 behaviour unchanged). Fail-open: any failure
+    returns the UNFILTERED goals (a filter bug must never crash the hook or
+    silently drop everything)."""
+    try:
+        if not goals or not drive_domains:
+            return goals
+        allowed = {str(d).strip() for d in drive_domains if str(d).strip()}
+        if not allowed:
+            return goals
+        kept = [
+            g for g in goals
+            if isinstance(g, dict) and str(g.get("domain") or "").strip() in allowed
+        ]
+        return kept
+    except Exception:
+        return goals
+
+
 def _fail_open(fn):
     """Wrap a hook so any exception is logged and swallowed (returns None).
 
@@ -136,6 +157,12 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
     # goals slice and render omits goal lines — appraisal otherwise unchanged.
     if drive_on:
         goals = (snapshot or {}).get("goals") or []
+        # DRIVE-06 containment control 2: the domain WHITELIST. When
+        # drive_domains is non-empty, only goals in a user-named domain reach
+        # appraisal/render; an empty whitelist (the default) imposes no
+        # restriction. Fail-open: a filter failure falls back to the unfiltered
+        # goals rather than crashing or silently dropping a flagged priority.
+        goals = _filter_goals_by_domain(goals, cfg.get("drive_domains") or [])
     else:
         goals = None
         store.record_telemetry("skipped:drive_disabled", session_id=session_id)
@@ -181,7 +208,16 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
     # user-flagged priority is NEVER silently omitted from the surfaced block
     # (it renders FIRST and outside the truncation pop range). goals is None
     # when drive is off, so the drive-off block stays byte-for-byte identical.
-    block = render.render_block(result.signals, snapshot=snapshot, goals=goals)
+    # DRIVE-06 containment control 3: the per-turn ENERGY BUDGET caps how many
+    # NON-flagged drive lines surface this turn. A flagged-priority want is
+    # EXEMPT (never-omit, DRIVE-05 > DRIVE-06) — the cap is applied inside
+    # render_block, after the protected flagged prefix is assembled, so a
+    # flagged want is never dropped to satisfy the budget. None ⇒ no cap.
+    energy_budget = cfg.get("drive_energy_budget") if drive_on else None
+    block = render.render_block(
+        result.signals, snapshot=snapshot, goals=goals,
+        energy_budget=energy_budget,
+    )
     if block is None:  # empty-signal suppression (APPR-05)
         return None
 

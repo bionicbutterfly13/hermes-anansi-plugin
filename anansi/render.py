@@ -362,7 +362,8 @@ def _flagged_want_lines(goal_signals, goals):
         return []
 
 
-def render_block(signals, snapshot=None, goals=None) -> Optional[str]:
+def render_block(signals, snapshot=None, goals=None,
+                 energy_budget=None) -> Optional[str]:
     """Render the sanitized [anansi appraisal] block, or None (APPR-04/05).
 
     Top-3 per category, observational phrasing, every interpolated text
@@ -383,6 +384,13 @@ def render_block(signals, snapshot=None, goals=None) -> Optional[str]:
     drive red line). Empty-signal suppression (APPR-05) still takes precedence:
     a flagged goal does NOT manufacture a block when there are zero signals;
     it only guarantees visibility WHEN a block already renders.
+
+    ``energy_budget`` (DRIVE-06, Phase 7) is the per-turn energy/attention cap
+    on how many NON-flagged drive lines (`- drive note:`) surface this turn.
+    None ⇒ no cap (07-01..03 behaviour). A flagged-priority `- drive want:`
+    line is EXEMPT (never-omit beats the budget — DRIVE-05 > DRIVE-06):
+    the budget only trims the non-flagged drive notes, never the protected
+    flagged prefix. Fail-open: a malformed budget falls back to no cap.
     """
     if not isinstance(signals, dict):
         return None
@@ -463,7 +471,20 @@ def render_block(signals, snapshot=None, goals=None) -> Optional[str]:
         ):
             continue  # already rendered as a protected first-person want line
         non_flagged_signals.append(item)
-    for item in non_flagged_signals[:3]:
+    # DRIVE-06 energy budget: the per-category ceiling is the standing top-3.
+    # When an energy_budget is supplied it FURTHER caps the number of NON-flagged
+    # drive notes (`min(3, budget)`); a budget of 0 surfaces no non-flagged drive
+    # note at all. Flagged `- drive want:` lines were already emitted into the
+    # protected prefix above and are NOT in this list, so the budget can never
+    # drop them (never-omit beats the budget — DRIVE-05 > DRIVE-06). Fail-open:
+    # a non-int budget leaves the standing top-3 ceiling in place.
+    note_limit = 3
+    try:
+        if energy_budget is not None:
+            note_limit = max(0, min(3, int(energy_budget)))
+    except (TypeError, ValueError):
+        note_limit = 3
+    for item in non_flagged_signals[:note_limit]:
         lines.append(_render_drive_note(item))
     if searches:
         quoted = "; ".join(
