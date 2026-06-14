@@ -91,7 +91,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 6. Drive effect is inspectable: neutral read, drive read, and drive-caused salience change are visible enough to audit
 
 **Design source:** `.planning/phases/06-proprietary-user-model-drive-design/06-CONTEXT.md`
-**Status:** [~] Planned, not executed — 07-01..07-04 exist; next workflow is `execute-phase 7`
+**Status:** [x] ✓ Complete 2026-06-14 — 4/4 plans executed, 165 tests green, verifier passed (07-VERIFICATION.md). 2 non-blocking gaps logged (pressure columns not persisted; global drive_pressure config-only). Next: verify-work 7.
 **Depends on:** Phase 6 (design)
 
 ## Coverage
