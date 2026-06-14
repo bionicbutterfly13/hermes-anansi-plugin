@@ -166,7 +166,7 @@ This project uses **learnship**. Key facts:
 
 <!-- Updated automatically by platform workflows -->
 
-**Milestone:** v1.0 — Hermes Anansi Memory Plugin
+**Milestone:** v1.0 — Hermes Anansi Metacognition Plugin
 **Phase:** 7 — Drive / Accountability
 **Status:** planning
 **Last updated:** 2026-06-14
