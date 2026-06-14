@@ -42,7 +42,9 @@ DIRECTIVE_PATTERNS = [
 ]
 
 # Every content line of a rendered block must carry one of these
-# observational labels ("- trust note:" is forward-compat for 03-02 REFL-05).
+# observational labels ("- trust note:" is forward-compat for 03-02 REFL-05;
+# "- drive note:" is the DRIVE-03 third-person goal-relation line — the
+# first-person "- drive want:" voice is registered in 07-03).
 ALLOWED_LABEL_PREFIXES = (
     "- instinct:",
     "- observation:",
@@ -50,6 +52,7 @@ ALLOWED_LABEL_PREFIXES = (
     "- possible memory searches:",
     "- gut reaction:",
     "- trust note:",
+    "- drive note:",
 )
 
 _DQUOTED_SPAN_RE = re.compile(r'"[^"]*"')

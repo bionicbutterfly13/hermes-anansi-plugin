@@ -159,13 +159,15 @@ def test_vocabulary_gating_and_clamping():
     assert signals["suggested_memory_searches"] == ["a", "b", "c"]  # <= 3
     assert len(signals["gut_reaction"]) == 200
 
-    # Non-dict document -> empty signal set, full five-key shape.
+    # Non-dict document -> empty signal set, full six-key shape
+    # (goal_signals is DRIVE-03, Phase 7).
     empty = appraisal.parse_signals(["not", "a", "dict"], 0.6)
     assert empty == {
         "instincts": [],
         "salient_observations": [],
         "contradiction_flags": [],
         "suggested_memory_searches": [],
+        "goal_signals": [],
         "gut_reaction": "",
     }
 

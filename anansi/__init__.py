@@ -161,6 +161,12 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
 
     if result.signals is None:
         return None
+    # DRIVE-06: when the drive is off, suppress goal-aware fields at render
+    # too — a faithful model returns no goal_signals (build_context omitted
+    # the goals slice), but stripping here makes the drive-off block
+    # byte-for-byte identical to a no-goals run regardless of model output.
+    if not drive_on and result.signals.get("goal_signals"):
+        result.signals["goal_signals"] = []
     # snapshot rides along for REFL-05 trust hints (advisory only; empty-
     # signal suppression inside render_block still takes precedence).
     block = render.render_block(result.signals, snapshot=snapshot)

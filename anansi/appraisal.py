@@ -58,10 +58,16 @@ When a persisted contradiction in the state dump is relevant to the current \
 message, re-surface it as a contradiction_flag referencing what changed.
 - suggested_memory_searches: up to 3 short advisory search phrases (text only — \
 nobody is obligated to run them).
+- goal_signals: when the message relates to a persisted goal in the state dump, \
+note that relation as an OBSERVATION ONLY — relates_to_goal is a short noun phrase \
+naming the goal; confidence 0-1. You are NOTICING a relation, not prescribing \
+action. Never turn a goal into an instruction, advice, or a next step. Omit this \
+array when nothing relates.
 - gut_reaction: one sentence (max 200 characters) of overall felt sense, or "".
 
-Observations only: never include directives, advice, suggested actions, goals, \
-or emotional-state breakdowns. Output JSON only — no prose, no markdown fences."""
+Observations only: never include directives, advice, suggested actions, goals \
+as instructions, or emotional-state breakdowns. Output JSON only — no prose, no \
+markdown fences."""
 
 _INSTINCT_KINDS = frozenset({"approach", "avoid", "caution", "curiosity", "protect"})
 _CONTRADICTION_KINDS = frozenset({"semantic", "narrative", "relational", "emotional"})
@@ -113,6 +119,21 @@ APPRAISAL_JSON_SCHEMA = {
         "suggested_memory_searches": {
             "type": "array",
             "items": {"type": "string"},
+        },
+        # DRIVE-03 (Phase 7): a BASIC goal-aware noun-field. The model NOTICES
+        # that the message relates to a persisted goal — it does not prescribe
+        # action. Permissive on purpose; shape discipline lives in
+        # parse_signals(). Velocity-aware fields (stalled_days, momentum) land
+        # in 07-02.
+        "goal_signals": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "relates_to_goal": {"type": "string"},
+                    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                },
+            },
         },
         "gut_reaction": {"type": "string"},
     },
@@ -173,14 +194,32 @@ def build_context(user_message, conversation_history, snapshot, history_chars,
         history_text = history_text[-history_chars:]  # keep the END
 
     if isinstance(snapshot, dict):
+        state = {
+            "concerns": snapshot.get("concerns"),
+            "contradictions": snapshot.get("contradictions"),
+            "trust_scores": snapshot.get("trust_scores"),
+            "affect_summary": snapshot.get("affect_summary"),
+        }
+        # DRIVE-03: surface only NON-candidate goals to the model — INERT
+        # candidates are never shown as active context. The goals key is
+        # OMITTED entirely when drive is off (goals is None) or nothing is
+        # active, keeping the context byte-for-byte identical to the
+        # pre-drive build. Compact projection (text/status/success_criteria).
+        if goals:
+            active = [
+                {
+                    "text": g.get("text"),
+                    "status": g.get("status"),
+                    "success_criteria": g.get("success_criteria"),
+                }
+                for g in goals
+                if isinstance(g, dict) and g.get("status") != "candidate"
+            ]
+            if active:
+                state["goals"] = active
         try:
             state_text = json.dumps(
-                {
-                    "concerns": snapshot.get("concerns"),
-                    "contradictions": snapshot.get("contradictions"),
-                    "trust_scores": snapshot.get("trust_scores"),
-                    "affect_summary": snapshot.get("affect_summary"),
-                },
+                state,
                 ensure_ascii=False,
                 separators=(",", ":"),
                 default=str,
@@ -383,7 +422,8 @@ def parse_signals(doc, threshold) -> dict:
 
     Unknown vocabulary dropped, floats clamped to [0,1], every signal with
     confidence < threshold DROPPED (APPR-03). Always returns the full
-    five-key shape; a non-dict doc yields the empty signal set.
+    six-key shape (goal_signals is DRIVE-03, Phase 7); a non-dict doc yields
+    the empty signal set.
     """
     if not isinstance(doc, dict):
         doc = {}
@@ -453,6 +493,21 @@ def parse_signals(doc, threshold) -> dict:
         if len(searches) >= 3:
             break
 
+    goal_signals = []
+    raw = doc.get("goal_signals")
+    for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, dict):
+            continue
+        relates = str(item.get("relates_to_goal", "") or "").strip()
+        if not relates:
+            continue
+        confidence = _clamp01(item.get("confidence"))
+        if confidence is None or confidence < threshold:
+            continue
+        goal_signals.append(
+            {"relates_to_goal": relates[:300], "confidence": confidence}
+        )
+
     gut = doc.get("gut_reaction")
     gut = gut.strip()[:200] if isinstance(gut, str) else ""
 
@@ -461,6 +516,7 @@ def parse_signals(doc, threshold) -> dict:
         "salient_observations": observations,
         "contradiction_flags": contradictions,
         "suggested_memory_searches": searches,
+        "goal_signals": goal_signals,
         "gut_reaction": gut,
     }
 

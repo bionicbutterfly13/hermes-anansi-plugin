@@ -141,10 +141,12 @@ def render_block(signals, snapshot=None) -> Optional[str]:
     observations = signals.get("salient_observations") or []
     contradictions = signals.get("contradiction_flags") or []
     searches = signals.get("suggested_memory_searches") or []
+    goal_signals = signals.get("goal_signals") or []
     gut = str(signals.get("gut_reaction") or "").strip()
 
     # Empty-signal suppression FIRST: no block, no header (APPR-05).
-    if not (instincts or observations or contradictions or searches or gut):
+    if not (instincts or observations or contradictions or searches
+            or goal_signals or gut):
         return None
 
     lines = [SENTINEL, FRAMING]
@@ -171,6 +173,17 @@ def render_block(signals, snapshot=None) -> Optional[str]:
             % (
                 item.get("kind", ""),
                 _sanitize_text(item.get("text", ""), 300),
+                _fmt(item.get("confidence")),
+            )
+        )
+    # DRIVE-03: observational goal-relation notes. THIRD-PERSON only — the
+    # first-person "- drive want:" voice lands in 07-03. Sanitized like every
+    # interpolated field; participates in the existing token cap.
+    for item in goal_signals[:3]:
+        lines.append(
+            "- drive note: relates to %s (confidence %s)"
+            % (
+                _sanitize_text(item.get("relates_to_goal", ""), 300),
                 _fmt(item.get("confidence")),
             )
         )
