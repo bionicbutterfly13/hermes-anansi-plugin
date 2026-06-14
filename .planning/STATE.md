@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-06-10)
 
 **Core value:** Every Hermes turn gets a grounded metacognitive appraisal injected before response generation; after PR #43906 was withdrawn, the plugin is proprietary and v1 remains the foundation.
-**Current focus:** Phase 6 design discussion COMPLETE; next is plan-phase 6 (first increment: Drive/accountability)
+**Current focus:** Phase 6 design complete; Phase 7 (Drive / Accountability) added — next is plan-phase 7
 
 ## Current Position
 
-Phase: 6 of 6 (Proprietary User Model + Drive Design)
-Plan: 06-CONTEXT captured — Phase 6 design decisions locked (autonomy boundary, scope/sequencing, architecture)
-Status: discuss-phase 6 COMPLETE. First increment = Drive/accountability (user-minted goals + progress velocity + in-turn goal-aware appraisal; never-omit invariant). Drive state extends the anansi SQLite store; heartbeat deferred to the increment that needs it; code-red interruption deferred to heartbeat planning. Next workflow: `plan-phase 6`.
-Last activity: 2026-06-14 — Completed discuss-phase 6; next workflow is `plan-phase 6`.
+Phase: 7 of 7 (Drive / Accountability — first proprietary implementation increment)
+Plan: not yet planned — run `plan-phase 7`
+Status: Phase 6 design COMPLETE (06-CONTEXT). Phase 7 added via add-phase to home the Drive/accountability BUILD (Phase 6 was design-only, 0 requirement IDs). Phase 7 = user-minted goals + progress velocity + in-turn goal-aware appraisal + never-omit invariant; drive state extends the anansi SQLite store (DRIVE-01..06). Next workflow: `plan-phase 7`.
+Last activity: 2026-06-14 — Added Phase 7 (Drive / Accountability); next workflow is `plan-phase 7`.
 
-Progress: [██████████] 100% v1; Phase 6 design captured — ready to plan the proprietary first increment
+Progress: [██████████] 100% v1; Phase 6 design captured; Phase 7 added — ready to plan the drive increment
 
 ## Performance Metrics
 
@@ -70,7 +70,11 @@ Progress: [██████████] 100% v1; Phase 6 design captured — 
 - ~~`telemetry_summary` counts reflect_* outcomes as failures~~ RESOLVED 2026-06-10 (04-01, 87484eb): vocabulary fixed in both failure_count and last_error; mixed-outcome test added
 - ~~Host sub-sessions run the full hook set — Phase-4 doc note~~ RESOLVED 2026-06-10 (04-01): documented honestly in anansi/README.md (sub-session section + WAL sidecar idiom)
 
+## Roadmap Evolution
+
+- Phase 7 added 2026-06-14: Drive / Accountability — first proprietary implementation increment. Homes the build designed in 06-CONTEXT (Phase 6 was design-only). Introduces proprietary requirement IDs DRIVE-01..06.
+
 ## Session Continuity
 
-Last session: 2026-06-14 (discuss-phase 6)
-Stopped at: Phase 6 design captured (06-CONTEXT.md); next: `plan-phase 6`.
+Last session: 2026-06-14 (discuss-phase 6 → add-phase 7)
+Stopped at: Phase 7 added; next: `plan-phase 7`.
