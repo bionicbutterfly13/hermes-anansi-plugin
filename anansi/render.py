@@ -275,6 +275,24 @@ def _want_text(item) -> str:
     return _sanitize_text(raw, 300)
 
 
+def _resolve_stalled_days(item):
+    """The neutral days-idle count from either shape: a top-level
+    ``stalled_days`` (an enriched goal_signal) or the nested
+    ``momentum.stalled_days`` (a persisted goal from read_snapshot). Returns an
+    int or None. Defensive; never raises."""
+    if not isinstance(item, dict):
+        return None
+    direct = item.get("stalled_days")
+    if isinstance(direct, int):
+        return direct
+    momentum = item.get("momentum")
+    if isinstance(momentum, dict):
+        nested = momentum.get("stalled_days")
+        if isinstance(nested, int):
+            return nested
+    return None
+
+
 def _render_drive_want(item) -> str:
     """One FIRST-PERSON owned-want line (DRIVE-04): the drive layer voices the
     agent's want as "I want <goal> ...". This is a NEW allowlisted label, NOT
@@ -291,7 +309,7 @@ def _render_drive_want(item) -> str:
     hidden. The neutral "stalled N days" read stays SEPARATE from the
     inspectable "[under-support: ...]" drive-effect clause (Pitfall #9)."""
     want = _want_text(item)
-    stalled_days = item.get("stalled_days")
+    stalled_days = _resolve_stalled_days(item)
     clause = "I want progress on %s" % want
     if isinstance(stalled_days, int):
         clause = "I want %s moving (stalled %d days)" % (want, stalled_days)
