@@ -129,6 +129,7 @@ def _cfg(**overrides):
         "history_chars": 4000,
         "model": None,
         "max_tokens": 700,
+        "drive_enabled": True,
     }
     cfg.update(overrides)
     return cfg
@@ -250,6 +251,7 @@ _DEFAULTS = {
     "reflect_every_n_turns": 5,
     "reflect_max_tokens": 700,
     "reflect_deadline_seconds": 8.0,
+    "drive_enabled": True,
 }
 
 
@@ -329,6 +331,81 @@ def test_gateway_rollover_reuses_module_state(pinned_env):
     assert third is None
     assert _telemetry_rows(pinned_env.db_path)[-1] == ("skipped:duplicate",)
     assert pinned_env.state["caller"].calls == 2
+
+
+# ---------------------------------------------------------------------------
+# DRIVE-06: the SEPARATE drive kill switch (success criterion 4) — drive off
+# ⇒ zero goal-aware fields, appraisal block byte-for-byte unchanged, and a
+# non-failure skipped:drive_disabled telemetry row.
+# ---------------------------------------------------------------------------
+
+
+def _seed_goals(db_path):
+    """Persist a flagged active goal + an INERT candidate into the tmp DB."""
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {"text": "ship the drive layer", "status": "active",
+                 "success_criteria": "phase 7 complete", "flagged_priority": 1},
+                {"text": "maybe a dashboard", "status": "candidate"},
+            ]
+        },
+        db_path,
+    ) is True
+
+
+def test_drive_disabled_appraisal_unchanged(pinned_env):
+    """Drive off + a goals-bearing snapshot: the hook still returns a normal
+    block; that block is byte-for-byte identical to the SAME inputs run with
+    NO goals present (the appraisal-unchanged invariant). A non-failure
+    skipped:drive_disabled telemetry row is recorded."""
+    message = "how is the migration going?"
+
+    # Run 1: drive OFF, goals present in the DB.
+    pinned_env.state["cfg"] = _cfg(drive_enabled=False)
+    _seed_goals(pinned_env.db_path)
+    pinned_env.state["caller"] = _CountingCaller(RICH_PAYLOAD)
+    out_off = anansi.pre_llm_call(session_id="s1", user_message=message)
+    assert isinstance(out_off, dict) and set(out_off) == {"context"}
+    assert out_off["context"].startswith("[anansi appraisal]")
+    # The non-failure skipped row rode along this eligible turn.
+    assert ("skipped:drive_disabled",) in _telemetry_rows(pinned_env.db_path)
+
+    # Run 2: drive ON but NO goals in a fresh DB — the reference block.
+    fresh_db = pinned_env.db_path.parent / "ref.db"
+    assert store.ensure_db(fresh_db) is True
+    real_get = store.get_db_path
+    try:
+        store.get_db_path = lambda: fresh_db
+        pinned_env.state["cfg"] = _cfg(drive_enabled=True)
+        anansi._session_state.update({"session_id": None, "last_msg_norm": None})
+        pinned_env.state["caller"] = _CountingCaller(RICH_PAYLOAD)
+        out_ref = anansi.pre_llm_call(session_id="s2", user_message=message)
+    finally:
+        store.get_db_path = real_get
+    assert isinstance(out_ref, dict) and set(out_ref) == {"context"}
+
+    # Byte-for-byte equal: drive-off-with-goals == drive-on-with-no-goals.
+    assert out_off["context"] == out_ref["context"]
+
+
+def test_drive_disabled_is_non_failure(pinned_env):
+    """skipped:drive_disabled rides the skipped:* exclusion prefix: it does
+    NOT count toward telemetry_summary.failure_count."""
+    pinned_env.state["cfg"] = _cfg(drive_enabled=False)
+    pinned_env.state["caller"] = _CountingCaller(RICH_PAYLOAD)
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is the migration going?"
+    )
+    assert isinstance(out, dict)
+    rows = _telemetry_rows(pinned_env.db_path)
+    assert ("skipped:drive_disabled",) in rows
+    assert ("ok",) in rows  # appraisal still ran
+
+    summary = store.telemetry_summary(pinned_env.db_path)
+    assert summary is not None
+    assert summary["failure_count"] == 0  # drive-disabled is a non-failure
+    assert summary["by_outcome"].get("skipped:drive_disabled") == 1
 
 
 # ---------------------------------------------------------------------------

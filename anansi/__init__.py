@@ -107,6 +107,14 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
         store.record_telemetry("skipped:disabled", session_id=session_id)
         return None
 
+    # The SEPARATE drive kill switch (DRIVE-06). Checked AFTER the appraisal
+    # kill switch and does NOT early-return: appraisal still runs unchanged
+    # when drive is off — only the goal-aware contribution is suppressed
+    # (build_context omits the goals slice, render omits goal lines). The
+    # skipped:drive_disabled telemetry row (a non-failure skipped:* prefix)
+    # is recorded once per ELIGIBLE turn, below, where appraisal actually runs.
+    drive_on = cfg.get("drive_enabled", True)
+
     if session_id != _session_state["session_id"]:  # session rollover guard
         _session_state["session_id"] = session_id
         _session_state["last_msg_norm"] = None
@@ -123,12 +131,22 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
         store.record_telemetry("skipped:no_ctx", session_id=session_id)
         return None
 
+    # DRIVE-06: once per ELIGIBLE turn, note the drive-off state as a
+    # non-failure skipped:* row. goals stays None so build_context omits the
+    # goals slice and render omits goal lines — appraisal otherwise unchanged.
+    if drive_on:
+        goals = (snapshot or {}).get("goals") or []
+    else:
+        goals = None
+        store.record_telemetry("skipped:drive_disabled", session_id=session_id)
+
     result = appraisal.run_appraisal(
         llm=_ctx.llm,
         user_message=user_message,
         conversation_history=conversation_history or [],
         snapshot=snapshot,
         cfg=cfg,
+        goals=goals,
     )
 
     store.record_telemetry(  # before returning; single quick INSERT, fail-open

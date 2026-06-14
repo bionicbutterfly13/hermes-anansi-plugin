@@ -142,13 +142,20 @@ class AppraisalResult:
 # ---------------------------------------------------------------------------
 
 
-def build_context(user_message, conversation_history, snapshot, history_chars) -> str:
+def build_context(user_message, conversation_history, snapshot, history_chars,
+                  goals=None) -> str:
     """Assemble the untrusted-input context for the appraisal call.
 
     History: last 6 message dicts, `role: content` lines, sentinel-bearing
     messages skipped (cheap echo guard), truncated to history_chars keeping
     the END. Snapshot: compact JSON of the four state surfaces, or
     "no persisted state". Hard total cap 12000 chars.
+
+    ``goals`` (DRIVE-03, Phase 7) is the drive-gated goals slice. When it is
+    None (drive off, or no goals), the state JSON omits the goals key entirely
+    — the context is byte-for-byte identical to the pre-drive build. When
+    provided, only NON-candidate goals are surfaced to the model (INERT
+    candidates are never shown as active context). Wiring lands in 07-01-03.
     """
     lines = []
     for message in (conversation_history or [])[-_MAX_HISTORY_MESSAGES:]:
@@ -225,8 +232,14 @@ def _reset_executor_for_tests() -> None:
 # ---------------------------------------------------------------------------
 
 
-def run_appraisal(*, llm, user_message, conversation_history, snapshot, cfg) -> AppraisalResult:
-    """Run one bounded appraisal call. NEVER raises."""
+def run_appraisal(*, llm, user_message, conversation_history, snapshot, cfg,
+                  goals=None) -> AppraisalResult:
+    """Run one bounded appraisal call. NEVER raises.
+
+    ``goals`` (DRIVE-03, Phase 7) is the drive-gated goals slice threaded into
+    build_context; None when drive is off (caller suppresses it), so the
+    appraisal context is byte-for-byte identical to the no-goals run.
+    """
     start = time.monotonic()
 
     def _wall_ms() -> int:
@@ -247,6 +260,7 @@ def run_appraisal(*, llm, user_message, conversation_history, snapshot, cfg) -> 
             conversation_history,
             snapshot,
             int(cfg.get("history_chars", 4000)),
+            goals=goals,
         )
         prompt = APPRAISAL_PROMPT.format(threshold=threshold)
 

@@ -21,6 +21,14 @@ Reflection keys (REFL-01, Phase 3):
     reflect_max_tokens        int, default 700
     reflect_deadline_seconds  float, clamped [0.5, 10.0], default 8.0
 
+Drive keys (DRIVE-06, Phase 7):
+    drive_enabled             bool, default True — the SEPARATE drive kill
+                              switch. Independent of `enabled`: when False the
+                              appraisal still runs unchanged, but no goal-aware
+                              fields are injected and no goal lines render
+                              (drive off ⇒ goal fields vanish, appraisal
+                              otherwise identical). Never gates the whole hook.
+
 Requested model (host trust gate — we only read WHICH model to request;
 allow_model_override / allowed_models are enforced by the host):
     plugins.entries.anansi.llm.model
@@ -46,6 +54,7 @@ DEFAULT_REFLECTION_ENABLED = True
 DEFAULT_REFLECT_EVERY_N_TURNS = 5
 DEFAULT_REFLECT_MAX_TOKENS = 700
 DEFAULT_REFLECT_DEADLINE_SECONDS = 8.0
+DEFAULT_DRIVE_ENABLED = True
 
 _cache = None
 
@@ -147,6 +156,9 @@ def get_cfg(force_reload=False) -> dict:
         "reflect_deadline_seconds": _coerce_float(
             entry.get("reflect_deadline_seconds"),
             DEFAULT_REFLECT_DEADLINE_SECONDS, 0.5, 10.0,
+        ),
+        "drive_enabled": _coerce_bool(
+            entry.get("drive_enabled"), DEFAULT_DRIVE_ENABLED
         ),
     }
     return _cache
