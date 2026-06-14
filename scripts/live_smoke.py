@@ -15,8 +15,9 @@ Behavior:
 - Does NOT write to the live state.db. Telemetry summary is printed via
   the read-only URI path in store.telemetry_summary() (returns None when
   the live DB is still schema v1 — expected before the first real turn).
-- When the network is down, prints a clean pending-network message and
-  exits 0 (the plan's network-outage contingency).
+- Exit codes are CI-honest: 0 = real appraisal returned signals; 2 = INCONCLUSIVE
+  (network down, or trust-gate/provider returned no signals). "Could not test" never
+  masquerades as "passed".
 """
 
 import json
@@ -24,6 +25,8 @@ import os
 import socket
 import sys
 from pathlib import Path
+
+PASS, FAIL, INCONCLUSIVE = 0, 1, 2
 
 
 def _bootstrap_sys_path() -> None:
@@ -48,10 +51,10 @@ def main() -> int:
     _bootstrap_sys_path()
 
     if not _network_up():
-        print("pending-network: cannot reach api.anthropic.com:443 — "
+        print("INCONCLUSIVE pending-network: cannot reach api.anthropic.com:443 — "
               "re-run this script when connectivity is restored:")
         print("  $HERMES_HOME/hermes-agent/venv/bin/python scripts/live_smoke.py")
-        return 0
+        return INCONCLUSIVE
 
     from agent.plugin_llm import PluginLlm
 
@@ -107,7 +110,13 @@ def main() -> int:
         else "unavailable (live DB likely still schema v1 — quarantines on "
              "first real turn)"
     ))
-    return 0
+    if not result.signals or result.outcome != "ok":
+        print("result: INCONCLUSIVE — outcome=%s, no usable signals "
+              "(network / trust-gate / provider condition, not an appraisal-code "
+              "defect)." % result.outcome)
+        return INCONCLUSIVE
+    print("result: PASS — real appraisal returned signals.")
+    return PASS
 
 
 if __name__ == "__main__":
