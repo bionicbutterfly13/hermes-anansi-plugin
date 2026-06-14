@@ -17,6 +17,7 @@ EXPECTED_TABLES = {
     "contradictions",
     "trust_scores",
     "turn_log",
+    "goals",
 }
 
 

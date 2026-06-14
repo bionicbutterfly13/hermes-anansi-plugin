@@ -107,7 +107,10 @@ def test_v2_db_quarantined_and_recreated_at_v3(tmp_path):
 
     assert store.ensure_db(db) is True
     assert len(_quarantine_files(tmp_path)) == 1
-    assert store.SCHEMA_VERSION == 3
+    # The v4 schema bump (DRIVE-01) keeps recreating at the CURRENT version —
+    # the v3 assistant_excerpt column is still part of it. Assert against
+    # store.SCHEMA_VERSION so the disposable-state proof survives future bumps.
+    assert store.SCHEMA_VERSION == 4
     assert "assistant_excerpt" in _turn_log_columns(db)
     conn = sqlite3.connect("file:%s?mode=ro" % db, uri=True)
     try:
@@ -116,7 +119,7 @@ def test_v2_db_quarantined_and_recreated_at_v3(tmp_path):
         ).fetchone()
     finally:
         conn.close()
-    assert row == ("3",)
+    assert row == (str(store.SCHEMA_VERSION),)
 
 
 # ---------------------------------------------------------------------------

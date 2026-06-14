@@ -32,7 +32,7 @@ from pathlib import Path
 
 logger = logging.getLogger("hermes.plugins.anansi.store")
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Per-table row caps (seed values; tune later with telemetry).
 CAPS = {
@@ -41,6 +41,7 @@ CAPS = {
     "turn_log": 500,
     "trust_scores": 64,
     "telemetry": 2000,
+    "goals": 50,
 }
 
 _DEFAULT_BUSY_TIMEOUT_MS = 5000
@@ -53,6 +54,7 @@ _TABLES = (
     "trust_scores",
     "turn_log",
     "telemetry",
+    "goals",
 )
 
 # Caps/decay columns (expires_at, decayed_weight) are in the schema NOW even
@@ -85,6 +87,20 @@ _SCHEMA_DDL = (
     """CREATE TABLE telemetry       (id INTEGER PRIMARY KEY, ts TEXT NOT NULL, session_id TEXT,
                                      wall_ms INTEGER, model TEXT, tokens_in INTEGER,
                                      tokens_out INTEGER, outcome TEXT NOT NULL, error TEXT)""",
+    # Schema v4 (DRIVE-01, Phase 7): user-minted goals persist in the single
+    # sqlite surface. status drives provenance — agent-nominated rows default
+    # to 'candidate' (INERT, never surfaced as active until a goals_status
+    # promotion); user-minted goals pass status='active' explicitly. Existing
+    # v3 DBs fail _verify_structure (version mismatch + missing table) and are
+    # quarantine-recreated — disposable-state doctrine, no migration code.
+    # flagged_priority and domain are written NOW even though only Phase 7's
+    # later plans read them — schema churn is the expensive part (mirrors the
+    # decay-column comment above).
+    """CREATE TABLE goals           (id INTEGER PRIMARY KEY, text TEXT NOT NULL,
+                                     status TEXT NOT NULL DEFAULT 'candidate'
+                                     CHECK (status IN ('active','queued','backburner','candidate')),
+                                     success_criteria TEXT, flagged_priority INTEGER NOT NULL DEFAULT 0,
+                                     domain TEXT, created_at TEXT, updated_at TEXT)""",
 )
 
 
@@ -308,6 +324,7 @@ def read_snapshot(db_path=None, include_decayed=False):
             "affect_summary": affect,
             "concerns": concerns,
             "contradictions": _rows_as_dicts(conn, "contradictions"),
+            "goals": _rows_as_dicts(conn, "goals"),
             "trust_scores": {
                 key: value
                 for key, value in conn.execute("SELECT key, value FROM trust_scores")
@@ -479,6 +496,52 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                             " value=excluded.value",
                             (str(meta_key), str(meta_value)),
                         )
+                elif key == "goals_add":
+                    # MECHANICAL insert (DRIVE-01). status defaults to
+                    # 'candidate' (the INERT agent-nominated default — the
+                    # agent nominates, never mints); a user-minted goal passes
+                    # status='active' explicitly. Policy/validation is the
+                    # caller's job.
+                    for item in payload:
+                        conn.execute(
+                            "INSERT INTO goals"
+                            " (text, status, success_criteria, flagged_priority,"
+                            " domain, created_at, updated_at)"
+                            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            (
+                                item.get("text"),
+                                item.get("status", "candidate"),
+                                item.get("success_criteria"),
+                                item.get("flagged_priority", 0),
+                                item.get("domain"),
+                                now,
+                                now,
+                            ),
+                        )
+                elif key == "goals_update":
+                    # Absolute values, pre-validated by the caller.
+                    for item in payload:
+                        conn.execute(
+                            "UPDATE goals SET text=?, success_criteria=?,"
+                            " flagged_priority=?, domain=?, updated_at=?"
+                            " WHERE id=?",
+                            (
+                                item.get("text"),
+                                item.get("success_criteria"),
+                                item.get("flagged_priority", 0),
+                                item.get("domain"),
+                                now,
+                                item.get("id"),
+                            ),
+                        )
+                elif key == "goals_status":
+                    # The promotion path candidate->active (and back).
+                    for item in payload:
+                        conn.execute(
+                            "UPDATE goals SET status=?, updated_at=?"
+                            " WHERE id=?",
+                            (item.get("status"), now, item.get("id")),
+                        )
                 elif key == "trust_scores":
                     for score_key, score_value in payload.items():
                         conn.execute(
@@ -512,7 +575,7 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
             # Enforce caps inside the SAME transaction: evict oldest rows
             # (lowest id) beyond each cap; trust_scores evicts oldest
             # updated_at beyond its cap.
-            for table in ("concerns", "contradictions", "turn_log"):
+            for table in ("concerns", "contradictions", "turn_log", "goals"):
                 conn.execute(
                     "DELETE FROM {t} WHERE id NOT IN"
                     " (SELECT id FROM {t} ORDER BY id DESC LIMIT ?)".format(t=table),
