@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-06-10)
 ## Current Position
 
 Phase: 7 of 7 (Drive / Accountability — first proprietary implementation increment)
-Plan: 07-01 COMPLETE (3/3 tasks, full suite green at 120 passed). Next: execute 07-02 (read-time velocity).
-Status: Plan 07-01 executed on branch phase-7-drive-accountability. DRIVE-01 (goal tables, schema v4, single sqlite surface — goals_add/goals_update/goals_status, candidate-default INERT), DRIVE-06 partial (SEPARATE drive kill switch `drive_enabled` + byte-for-byte drive-off invariant + `skipped:drive_disabled` non-failure telemetry), and DRIVE-03 partial (`goal_signals` schema/parse/prompt + observational `- drive note:` render line + candidate-exclusion in build_context, within the 12000-char cap) are landed and tested. Velocity (07-02), first-person voice + never-omit/anti-complacency (07-03), domain whitelist + energy budget + inspectable drive effect (07-04) remain. Next workflow: `execute-phase 7` (plan 07-02).
-Last activity: 2026-06-14 — Executed plan 07-01 (DRIVE-01 + DRIVE-06 partial + DRIVE-03 partial); 3 atomic commits; SUMMARY written.
+Plan: 07-02 COMPLETE (2/2 tasks, full suite green at 135 passed). Next: execute 07-03 (first-person voice + never-omit/anti-complacency).
+Status: Plans 07-01 + 07-02 executed on branch phase-7-drive-accountability. DRIVE-01 (goal tables, schema v4, single sqlite surface), DRIVE-06 partial (drive kill switch + byte-for-byte invariant + non-failure telemetry), DRIVE-03 partial (goal_signals + `- drive note:` line) landed in 07-01. DRIVE-02 (07-02): stdlib-only `goal_momentum` helper in store.py derives per-goal momentum (`stalled N days`/`moving`/`unknown` + salience where stalled > moving) from GROUND TRUTH — read-mode `open()` of git reflog/refs + `os.stat().st_mtime` — at appraisal-READ time in `read_snapshot` (NOT behind debounced reflection); `stalled_days` threads through goal_signals schema/parse + the `- drive note:` render line; stalled goals render FIRST (salience/ordering, never imperative); user-authorized pressure (`support_style`/`push_when_stalled`) raises salience while the neutral momentum and drive effect stay separate/inspectable; every velocity path is fail-open (absent/corrupt .git, unparseable reflog, bad timestamp → benign `unknown`, never raises). First-person voice + never-omit/anti-complacency (07-03), domain whitelist + energy budget (07-04) remain. Next workflow: `execute-phase 7` (plan 07-03).
+Last activity: 2026-06-14 — Executed plan 07-02 (DRIVE-02 read-time velocity); 2 atomic commits; SUMMARY written; suite 120 → 135 passed.
 
-Progress: [██████████] 100% v1; Phase 6 design captured; Phase 7 plan 07-01 of 04 complete — drive tracer bullet landed
+Progress: [██████████] 100% v1; Phase 6 design captured; Phase 7 plans 07-01 + 07-02 of 04 complete — read-time velocity landed
 
 ## Performance Metrics
 
@@ -65,6 +65,9 @@ Progress: [██████████] 100% v1; Phase 6 design captured; Pha
 | Goal state lives in store.py schema v4 (`goals` table); agent-nominated goals default to INERT `status='candidate'`, never surfaced as active until a goals_status promotion | 7 | DRIVE-01 (07-01); goal provenance — agent nominates, user mints; single sqlite surface preserved |
 | Drive kill switch (`drive_enabled`) is SEPARATE from appraisal `enabled`; gated AFTER the appraisal check, no early-return; drive-off block is byte-for-byte identical to a no-goals run; `skipped:drive_disabled` is a non-failure | 7 | DRIVE-06 partial (07-01); success criterion 4 — drive-off suppression proven via byte-for-byte test + telemetry exclusion-list |
 | Drive-off suppression is belt-and-suspenders: build_context omits the goals slice AND __init__ strips goal_signals before render | 7 | 07-01 — byte-for-byte invariant holds regardless of (fake/adversarial) model output, not just a faithful model |
+| Per-goal momentum derived at READ time in store.read_snapshot (git reflog committer epoch + os.stat mtimes via stdlib read-mode open() only — NO subprocess/git lib), NOT behind debounced reflection | 7 | DRIVE-02 (07-02); a goal that stalled this turn reads stalled this turn (Pitfall #3); anti-creep forbidden-substring scan bricks on subprocess/os.system even in comments |
+| "Stalled louder" = SALIENCE/ORDERING (stalled goals render first), never imperative loudness; neutral momentum (stalled_days) and drive-caused pressure effect (`[push zone]` clause) render SEPARATELY and stay inspectable | 7 | DRIVE-02 (07-02); SAFE-04 + reactance — loudness-via-imperative is forbidden; Pitfall #9 inspectability red line |
+| `enrich_goal_signals` grounds each parsed goal_signal in the matching persisted goal's read-time momentum + pressure metadata; goal `domain` doubles as the per-goal mtime hint (repo-containment guarded) | 7 | DRIVE-02 (07-02); stalled signal anchored to ground truth even when the model omits stalled_days; no schema bump |
 
 ## Blockers / Concerns
 
@@ -81,5 +84,5 @@ Progress: [██████████] 100% v1; Phase 6 design captured; Pha
 
 ## Session Continuity
 
-Last session: 2026-06-14 (executed Phase 7 plan 07-01 on branch phase-7-drive-accountability)
-Stopped at: 07-01 complete (3 atomic commits, suite green 120 passed, SUMMARY written); next: execute plan 07-02 (read-time velocity).
+Last session: 2026-06-14 (executed Phase 7 plan 07-02 on branch phase-7-drive-accountability)
+Stopped at: 07-02 complete (2 atomic commits, suite green 135 passed, SUMMARY written); next: execute plan 07-03 (first-person voice + never-omit/anti-complacency).
