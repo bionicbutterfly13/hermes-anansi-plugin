@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-06-10)
 
 **Core value:** Every Hermes turn gets a grounded metacognitive appraisal injected before response generation; after PR #43906 was withdrawn, the plugin is proprietary and v1 remains the foundation.
-**Current focus:** Phase 6 design complete; Phase 7 (Drive / Accountability) added — next is plan-phase 7
+**Current focus:** Phase 6 design complete; Phase 7 (Drive / Accountability) planned — next is execute-phase 7
 
 ## Current Position
 
 Phase: 7 of 7 (Drive / Accountability — first proprietary implementation increment)
-Plan: not yet planned — run `plan-phase 7`
-Status: Phase 6 design COMPLETE (06-CONTEXT). Phase 7 added via add-phase to home the Drive/accountability BUILD (Phase 6 was design-only, 0 requirement IDs). Phase 7 = user-minted goals + progress velocity + in-turn goal-aware appraisal + never-omit invariant; drive state extends the anansi SQLite store (DRIVE-01..06). Next workflow: `plan-phase 7`.
-Last activity: 2026-06-14 — Added Phase 7 (Drive / Accountability); next workflow is `plan-phase 7`.
+Plan: 07-01 COMPLETE (3/3 tasks, full suite green at 120 passed). Next: execute 07-02 (read-time velocity).
+Status: Plan 07-01 executed on branch phase-7-drive-accountability. DRIVE-01 (goal tables, schema v4, single sqlite surface — goals_add/goals_update/goals_status, candidate-default INERT), DRIVE-06 partial (SEPARATE drive kill switch `drive_enabled` + byte-for-byte drive-off invariant + `skipped:drive_disabled` non-failure telemetry), and DRIVE-03 partial (`goal_signals` schema/parse/prompt + observational `- drive note:` render line + candidate-exclusion in build_context, within the 12000-char cap) are landed and tested. Velocity (07-02), first-person voice + never-omit/anti-complacency (07-03), domain whitelist + energy budget + inspectable drive effect (07-04) remain. Next workflow: `execute-phase 7` (plan 07-02).
+Last activity: 2026-06-14 — Executed plan 07-01 (DRIVE-01 + DRIVE-06 partial + DRIVE-03 partial); 3 atomic commits; SUMMARY written.
 
-Progress: [██████████] 100% v1; Phase 6 design captured; Phase 7 added — ready to plan the drive increment
+Progress: [██████████] 100% v1; Phase 6 design captured; Phase 7 plan 07-01 of 04 complete — drive tracer bullet landed
 
 ## Performance Metrics
 
@@ -60,6 +60,11 @@ Progress: [██████████] 100% v1; Phase 6 design captured; Pha
 | Phase 6 first increment = Drive/accountability; drive state extends anansi SQLite store (store.py) | 6 | discuss-phase 6 / 06-CONTEXT; single sqlite surface preserved |
 | Never-omit invariant: agent guesses never outrank stated priorities; never silently drop a flagged item | 6 | Core drive red line; silent omission = betrayal (Dr. Mani top anti-value) |
 | Drive surfacing in-turn only (no proactive push); heartbeat + code-red interruption deferred | 6 | Extends one-turn-lag idiom; fail-open preserved; code-red needs user-defined triggers only |
+| Drive pressure adjustable + inspectable | 6 | Drive may adjust salience/urgency/persistence only; neutral read vs drive effect must stay visible |
+| Anti-complacency is part of drive safety | 6 | User-authorized push zones prevent stalled high-priority goals from being quietly downranked; under-support must be surfaced |
+| Goal state lives in store.py schema v4 (`goals` table); agent-nominated goals default to INERT `status='candidate'`, never surfaced as active until a goals_status promotion | 7 | DRIVE-01 (07-01); goal provenance — agent nominates, user mints; single sqlite surface preserved |
+| Drive kill switch (`drive_enabled`) is SEPARATE from appraisal `enabled`; gated AFTER the appraisal check, no early-return; drive-off block is byte-for-byte identical to a no-goals run; `skipped:drive_disabled` is a non-failure | 7 | DRIVE-06 partial (07-01); success criterion 4 — drive-off suppression proven via byte-for-byte test + telemetry exclusion-list |
+| Drive-off suppression is belt-and-suspenders: build_context omits the goals slice AND __init__ strips goal_signals before render | 7 | 07-01 — byte-for-byte invariant holds regardless of (fake/adversarial) model output, not just a faithful model |
 
 ## Blockers / Concerns
 
@@ -76,5 +81,5 @@ Progress: [██████████] 100% v1; Phase 6 design captured; Pha
 
 ## Session Continuity
 
-Last session: 2026-06-14 (discuss-phase 6 → add-phase 7)
-Stopped at: Phase 7 added; next: `plan-phase 7`.
+Last session: 2026-06-14 (executed Phase 7 plan 07-01 on branch phase-7-drive-accountability)
+Stopped at: 07-01 complete (3 atomic commits, suite green 120 passed, SUMMARY written); next: execute plan 07-02 (read-time velocity).
