@@ -167,9 +167,9 @@ This project uses **learnship**. Key facts:
 <!-- Updated automatically by platform workflows -->
 
 **Milestone:** v1.0 — Hermes Anansi Memory Plugin
-**Phase:** 5 — Proprietary Pivot State Reconciliation
+**Phase:** 7 — Drive / Accountability
 **Status:** planning
-**Last updated:** 2026-06-12
+**Last updated:** 2026-06-14
 
 ---
 
