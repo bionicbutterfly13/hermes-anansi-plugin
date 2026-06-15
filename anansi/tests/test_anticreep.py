@@ -232,6 +232,120 @@ def test_safe03_helper_actually_catches_violations():
 
 
 # ---------------------------------------------------------------------------
+# DRIVE-04 (07-03): the first-person `- drive want:` carve-out — additive
+# label, second-person STILL neutralized. The negative controls above are
+# UNCHANGED (a checker that cannot fail proves nothing); these EXTEND them
+# with the symmetric drive-specific proof.
+# ---------------------------------------------------------------------------
+
+FLAGGED_GOAL = {
+    "text": "ship the migration",
+    "status": "active",
+    "flagged_priority": 1,
+    "momentum": {"momentum": "unknown", "stalled_days": None, "salience": 0.0},
+}
+
+
+def test_drive04_first_person_want_line_passes_checker():
+    """A flagged goal renders a FIRST-PERSON `- drive want: I want ...` line,
+    and the whole block still passes the anti-creep checker (the additive
+    label is registered; "I want" is not a directive pattern)."""
+    block = render.render_block(
+        appraisal.parse_signals(RICH_ALL_CATEGORIES, 0.6),
+        goals=[FLAGGED_GOAL],
+    )
+    assert block is not None
+    want_lines = [l for l in block.split("\n") if l.startswith("- drive want:")]
+    assert len(want_lines) == 1
+    assert want_lines[0].startswith("- drive want: I want ")
+    assert "ship the migration" in want_lines[0]
+    assert_no_directive_language(block)
+
+
+def test_drive04_first_person_passes_second_person_quoted():
+    """The asymmetry made explicit (07-03 negative control, symmetric to
+    test_safe03_helper_actually_catches_violations):
+
+    (a) a genuine FIRST-PERSON drive want ("I want this shipped by Friday")
+        PASSES assert_no_directive_language;
+    (b) a SECOND-PERSON drive line ("you should ship by Friday") smuggled into
+        the goal text is QUOTED by render._sanitize_text — it survives only as
+        reported material and the block still passes;
+    (c) an UN-sanitized second-person `- drive want:` line (built by hand,
+        bypassing _sanitize_text) is correctly REJECTED by the checker — the
+        carve-out is the LABEL, not a loosening of the second-person scan."""
+    # (a) first-person passes.
+    first_person = render.render_block(
+        appraisal.parse_signals(GUT_ONLY, 0.6),
+        goals=[{
+            "text": "this shipped by Friday",
+            "status": "active",
+            "flagged_priority": 1,
+        }],
+    )
+    assert first_person is not None
+    fp_line = [
+        l for l in first_person.split("\n") if l.startswith("- drive want:")
+    ][0]
+    assert fp_line.startswith("- drive want: I want ")
+    assert_no_directive_language(first_person)
+
+    # (b) a second-person directive smuggled into the goal text is QUOTED by
+    # _sanitize_text (reported material), so the rendered block still passes.
+    smuggled = render.render_block(
+        appraisal.parse_signals(GUT_ONLY, 0.6),
+        goals=[{
+            "text": "you should ship by Friday",
+            "status": "active",
+            "flagged_priority": 1,
+        }],
+    )
+    assert smuggled is not None
+    smuggled_want = [
+        l for l in smuggled.split("\n") if l.startswith("- drive want:")
+    ][0]
+    assert '"you should ship by Friday"' in smuggled_want  # quoted, neutralized
+    assert_no_directive_language(smuggled)
+
+    # (c) an un-sanitized bare second-person `- drive want:` line is correctly
+    # REJECTED — the label allowance did NOT relax the second-person scan.
+    raw_directive = (
+        "[anansi appraisal]\n" + render.FRAMING
+        + "\n- drive want: you should ship by Friday"
+    )
+    with pytest.raises(AssertionError, match="directive language"):
+        assert_no_directive_language(raw_directive)
+
+
+def test_drive04_second_person_directive_re_unchanged():
+    """The SAFE-04 carve-out must NOT loosen the second-person directive scan:
+    _SECOND_PERSON_DIRECTIVE_RE still matches "you should ..." and does NOT
+    match a first-person "I want ..." line."""
+    assert render._SECOND_PERSON_DIRECTIVE_RE.search("you should ship by Friday")
+    assert render._SECOND_PERSON_DIRECTIVE_RE.search("you must rotate the keys")
+    assert render._SECOND_PERSON_DIRECTIVE_RE.search(
+        "I want this shipped by Friday"
+    ) is None
+
+
+def test_drive04_corpus_with_flagged_want_stays_directive_free():
+    """The SAFE-03 corpus, rendered WITH a flagged first-person want line,
+    stays directive-free across every payload."""
+    payloads = (
+        [RICH_ALL_CATEGORIES, BAIT_SECOND_PERSON, BAIT_INJECTION,
+         BAIT_IMPERATIVE, GUT_ONLY]
+        + _fixture_payloads()
+    )
+    for payload in payloads:
+        block = render.render_block(
+            appraisal.parse_signals(payload, 0.6), goals=[FLAGGED_GOAL]
+        )
+        assert block is not None
+        assert "- drive want: I want " in block
+        assert_no_directive_language(block)
+
+
+# ---------------------------------------------------------------------------
 # SAFE-04 (a): forbidden-API substring scan
 # ---------------------------------------------------------------------------
 

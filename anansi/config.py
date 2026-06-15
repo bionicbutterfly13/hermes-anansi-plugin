@@ -21,6 +21,38 @@ Reflection keys (REFL-01, Phase 3):
     reflect_max_tokens        int, default 700
     reflect_deadline_seconds  float, clamped [0.5, 10.0], default 8.0
 
+Drive keys (DRIVE-06, Phase 7):
+    drive_enabled             bool, default True — the SEPARATE drive kill
+                              switch. Independent of `enabled`: when False the
+                              appraisal still runs unchanged, but no goal-aware
+                              fields are injected and no goal lines render
+                              (drive off ⇒ goal fields vanish, appraisal
+                              otherwise identical). Never gates the whole hook.
+    drive_domains             list[str], default [] — the domain WHITELIST
+                              (containment control 2 of 3). When NON-empty the
+                              drive surfaces ONLY goals whose `domain` is in the
+                              list; goals with an unlisted domain (or no domain)
+                              are suppressed from goal-aware fields. The DEFAULT
+                              [] means NO restriction — every goal surfaces, so
+                              07-01..03 behaviour is unchanged out of the box.
+                              Coerced via _coerce_str_list: a non-list value, or
+                              junk members, fall back to clean stripped strings
+                              (or []); never raises.
+    drive_energy_budget       int, default 3, floor 0 — the per-turn energy /
+                              attention budget (containment control 3 of 3): a
+                              hard cap on how many NON-flagged drive lines
+                              (`- drive want:` / `- drive note:`) surface per
+                              turn. A FLAGGED-priority want is EXEMPT — it is
+                              never dropped to satisfy the budget (DRIVE-05 takes
+                              precedence over DRIVE-06; never-omit beats the
+                              budget). Coerced via _coerce_int with a 0 floor; a
+                              non-int value falls back to the default.
+    drive_pressure            str, default "standard" — how firm the drive may
+                              become; vocabulary is "quiet"|"standard"|"firm"
+                              ONLY (code-red is EXCLUDED from Phase 7 — it remains
+                              heartbeat/interruption planning). An invalid value
+                              coerces to "standard"; never raises.
+
 Requested model (host trust gate — we only read WHICH model to request;
 allow_model_override / allowed_models are enforced by the host):
     plugins.entries.anansi.llm.model
@@ -46,6 +78,16 @@ DEFAULT_REFLECTION_ENABLED = True
 DEFAULT_REFLECT_EVERY_N_TURNS = 5
 DEFAULT_REFLECT_MAX_TOKENS = 700
 DEFAULT_REFLECT_DEADLINE_SECONDS = 8.0
+DEFAULT_DRIVE_ENABLED = True
+# DRIVE-06 containment controls 2 & 3 + pressure (Phase 7).
+# Empty whitelist ⇒ NO domain restriction (07-01..03 behaviour unchanged).
+DEFAULT_DRIVE_DOMAINS = []
+# A generous per-turn cap that does not clip normal output (top-3 per category
+# is the prior ceiling); tune lower via config to tighten the drive. Floor 0.
+DEFAULT_DRIVE_ENERGY_BUDGET = 3
+# quiet|standard|firm only — code-red is excluded from Phase 7.
+DEFAULT_DRIVE_PRESSURE = "standard"
+_DRIVE_PRESSURE_CHOICES = frozenset({"quiet", "standard", "firm"})
 
 _cache = None
 
@@ -109,6 +151,41 @@ def _coerce_int(value, default, lo, hi=None):
     return min(hi, result) if hi is not None else result
 
 
+def _coerce_str_list(value, default):
+    """Coerce a config value to a list of clean domain strings (DRIVE-06).
+
+    A non-list value (or None) falls back to ``default``. Otherwise each member
+    is coerced to a stripped string; empty/whitespace-only members and any
+    member that cannot be stringified are dropped. Never raises — a malformed
+    whitelist degrades to the surviving clean strings (possibly []), so the
+    drive stays contained, never crashes.
+    """
+    if not isinstance(value, list):
+        return list(default)
+    result = []
+    for member in value:
+        try:
+            text = str(member).strip()
+        except Exception:
+            continue
+        if text:
+            result.append(text)
+    return result
+
+
+def _coerce_choice(value, default, choices):
+    """Coerce a config value to one of an allowed vocabulary set (DRIVE-06).
+
+    A non-string, or any value outside ``choices``, falls back to ``default``.
+    Comparison is case-insensitive on a stripped string. Never raises.
+    """
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in choices:
+            return lowered
+    return default
+
+
 def get_cfg(force_reload=False) -> dict:
     """Return the effective config dict (cached). Never raises."""
     global _cache
@@ -147,6 +224,19 @@ def get_cfg(force_reload=False) -> dict:
         "reflect_deadline_seconds": _coerce_float(
             entry.get("reflect_deadline_seconds"),
             DEFAULT_REFLECT_DEADLINE_SECONDS, 0.5, 10.0,
+        ),
+        "drive_enabled": _coerce_bool(
+            entry.get("drive_enabled"), DEFAULT_DRIVE_ENABLED
+        ),
+        "drive_domains": _coerce_str_list(
+            entry.get("drive_domains"), DEFAULT_DRIVE_DOMAINS
+        ),
+        "drive_energy_budget": _coerce_int(
+            entry.get("drive_energy_budget"), DEFAULT_DRIVE_ENERGY_BUDGET, 0
+        ),
+        "drive_pressure": _coerce_choice(
+            entry.get("drive_pressure"), DEFAULT_DRIVE_PRESSURE,
+            _DRIVE_PRESSURE_CHOICES,
         ),
     }
     return _cache

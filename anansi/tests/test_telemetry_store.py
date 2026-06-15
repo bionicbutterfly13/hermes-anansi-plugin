@@ -251,6 +251,10 @@ def test_get_cfg_defaults_when_host_config_unavailable(monkeypatch):
         "reflect_every_n_turns": 5,
         "reflect_max_tokens": 700,
         "reflect_deadline_seconds": 8.0,
+        "drive_enabled": True,
+        "drive_domains": [],
+        "drive_energy_budget": 3,
+        "drive_pressure": "standard",
     }
     # SAFE-01 (R1, 2026-06-10): the in-code default deadline is 8.0s.
     assert cfg["deadline_seconds"] == config.DEFAULT_DEADLINE_SECONDS == 8.0

@@ -32,7 +32,7 @@ from pathlib import Path
 
 logger = logging.getLogger("hermes.plugins.anansi.store")
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Per-table row caps (seed values; tune later with telemetry).
 CAPS = {
@@ -41,6 +41,7 @@ CAPS = {
     "turn_log": 500,
     "trust_scores": 64,
     "telemetry": 2000,
+    "goals": 50,
 }
 
 _DEFAULT_BUSY_TIMEOUT_MS = 5000
@@ -53,6 +54,7 @@ _TABLES = (
     "trust_scores",
     "turn_log",
     "telemetry",
+    "goals",
 )
 
 # Caps/decay columns (expires_at, decayed_weight) are in the schema NOW even
@@ -85,6 +87,20 @@ _SCHEMA_DDL = (
     """CREATE TABLE telemetry       (id INTEGER PRIMARY KEY, ts TEXT NOT NULL, session_id TEXT,
                                      wall_ms INTEGER, model TEXT, tokens_in INTEGER,
                                      tokens_out INTEGER, outcome TEXT NOT NULL, error TEXT)""",
+    # Schema v4 (DRIVE-01, Phase 7): user-minted goals persist in the single
+    # sqlite surface. status drives provenance — agent-nominated rows default
+    # to 'candidate' (INERT, never surfaced as active until a goals_status
+    # promotion); user-minted goals pass status='active' explicitly. Existing
+    # v3 DBs fail _verify_structure (version mismatch + missing table) and are
+    # quarantine-recreated — disposable-state doctrine, no migration code.
+    # flagged_priority and domain are written NOW even though only Phase 7's
+    # later plans read them — schema churn is the expensive part (mirrors the
+    # decay-column comment above).
+    """CREATE TABLE goals           (id INTEGER PRIMARY KEY, text TEXT NOT NULL,
+                                     status TEXT NOT NULL DEFAULT 'candidate'
+                                     CHECK (status IN ('active','queued','backburner','candidate')),
+                                     success_criteria TEXT, flagged_priority INTEGER NOT NULL DEFAULT 0,
+                                     domain TEXT, created_at TEXT, updated_at TEXT)""",
 )
 
 
@@ -243,6 +259,203 @@ def _rows_as_dicts(conn, table: str) -> list:
 _DECAY_HALF_LIFE_DAYS = 7.0
 DECAY_PRUNE_THRESHOLD = 0.1
 
+# ---------------------------------------------------------------------------
+# Per-goal progress velocity (DRIVE-02, Phase 7) — momentum derived from
+# GROUND TRUTH at appraisal-READ time (NOT behind debounced reflection — see
+# 07-RESEARCH Pitfall #3). Ground truth = stdlib-only signals: read-mode
+# open() of the git reflog/refs + os.stat().st_mtime. NO shell-out, NO git
+# library — only stdlib file reads (07-RESEARCH Pitfall #2 — the anti-creep
+# forbidden-substring + import-allowlist scans brick the suite on any
+# shell/SDK reach). Every helper here mirrors _effective_weight's
+# try/except-to-benign-default style: it returns a safe value on ANY error
+# and NEVER raises into the read path.
+# ---------------------------------------------------------------------------
+_STALLED_DAYS_THRESHOLD = 2.0  # idle >= this many days reads 'stalled'
+
+# Neutral salience weights: a stalled goal is LOUDER than a moving one purely
+# by ordering/salience (07-RESEARCH external note — loudness-via-imperative is
+# what SAFE-04 forbids and reactance research penalizes). Drive-caused
+# (pressure) adjustments stay SEPARATE from this neutral read (see render.py).
+_MOMENTUM_SALIENCE = {
+    "stalled": 1.0,
+    "moving": 0.3,
+    "unknown": 0.0,
+}
+
+
+def _momentum_default():
+    """The benign default for ANY failure — 'unknown', no days, zero
+    salience. Mirrors _effective_weight returning the safe value on error."""
+    return {"momentum": "unknown", "stalled_days": None, "salience": 0.0}
+
+
+def _repo_root(start=None):
+    """Walk up from a discovered start dir until a `.git` directory is found;
+    return the Path of the repo root, or None. Start is cwd or the
+    $HERMES_HOME parent — NEVER a literal path (standing rule). Never raises.
+    """
+    try:
+        if start is not None:
+            current = Path(start)
+        else:
+            try:
+                current = Path(os.getcwd())
+            except Exception:
+                current = None
+            if current is None:
+                home = os.environ.get("HERMES_HOME")
+                current = Path(home).parent if home else None
+        if current is None:
+            return None
+        current = current.resolve()
+        for candidate in (current, *current.parents):
+            if (candidate / ".git").is_dir():
+                return candidate
+        return None
+    except Exception:
+        return None
+
+
+def _last_commit_epoch(repo_root):
+    """Resolve the current branch tip's committer epoch from the git reflog
+    using ONLY read-mode open() + path reads — NO shell-out, NO git library.
+
+    `.git/HEAD` holds `ref: refs/heads/<branch>` (or a bare sha when
+    detached); the LAST line of `.git/logs/HEAD` is the most-recent reflog
+    entry, whose committer epoch is the integer field immediately BEFORE the
+    timezone offset, just before the `\\t`. Returns a float epoch, or None on
+    ANY problem (absent/corrupt .git, unreadable reflog, unparseable line).
+    Never raises.
+    """
+    try:
+        if repo_root is None:
+            return None
+        git_dir = Path(repo_root) / ".git"
+        # Resolve HEAD purely for completeness/robustness; the reflog tail is
+        # the authoritative recency signal regardless of branch.
+        head_path = git_dir / "HEAD"
+        if head_path.is_file():
+            with open(head_path, "r", encoding="utf-8") as fh:
+                head = fh.read().strip()
+            if head.startswith("ref:"):
+                ref = head.split(":", 1)[1].strip()
+                ref_path = git_dir / ref
+                # Touch the ref file read-only if present (tip sha); its
+                # presence is not required for the reflog parse below.
+                if ref_path.is_file():
+                    with open(ref_path, "r", encoding="utf-8") as fh:
+                        fh.read()
+        reflog_path = git_dir / "logs" / "HEAD"
+        if not reflog_path.is_file():
+            return None
+        with open(reflog_path, "r", encoding="utf-8") as fh:
+            lines = [ln for ln in fh.read().splitlines() if ln.strip()]
+        if not lines:
+            return None
+        last = lines[-1]
+        # Split off the "\tcommit: <msg>" tail; the committer epoch is the
+        # integer field immediately before the tz offset in the head part.
+        head_part = last.split("\t", 1)[0]
+        fields = head_part.split()
+        if len(fields) < 2:
+            return None
+        # fields[-1] is the tz offset (e.g. -0400); fields[-2] is the epoch.
+        return float(int(fields[-2]))
+    except Exception:
+        return None
+
+
+def _days_idle_from_epoch(epoch, now):
+    """days-idle from a float epoch, mirroring _effective_weight's day-math.
+    Returns a non-negative float, or None on any problem. Never raises."""
+    try:
+        ts = datetime.fromtimestamp(float(epoch), tz=timezone.utc)
+        return max(0.0, (now - ts).total_seconds() / 86400.0)
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+
+def _days_idle_from_iso(ts_text, now):
+    """days-idle from an ISO timestamp string (a goal's updated_at), mirroring
+    _effective_weight's naive->UTC coercion. None on any problem. Never
+    raises."""
+    try:
+        ts = datetime.fromisoformat(str(ts_text))
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        return max(0.0, (now - ts).total_seconds() / 86400.0)
+    except (TypeError, ValueError):
+        return None
+
+
+def _goal_mtime_days_idle(goal, repo_root, now):
+    """If the goal carries a resolvable path/domain hint inside repo_root, use
+    os.stat().st_mtime of that file/dir as the goal's ground truth. Returns a
+    days-idle float, or None when no hint resolves. Never raises."""
+    try:
+        if not isinstance(goal, dict) or repo_root is None:
+            return None
+        hint = goal.get("domain")
+        if not hint or not isinstance(hint, str):
+            return None
+        candidate = (Path(repo_root) / hint).resolve()
+        # Containment guard: only stat paths inside the repo root.
+        root = Path(repo_root).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            return None
+        if not candidate.exists():
+            return None
+        mtime = os.stat(candidate).st_mtime
+        return _days_idle_from_epoch(mtime, now)
+    except Exception:
+        return None
+
+
+def goal_momentum(goal, repo_root=None, now=None):
+    """Per-goal momentum from GROUND TRUTH at READ time (DRIVE-02).
+
+    Ground truth, best-available first:
+      1. a resolvable goal path/domain hint's os.stat().st_mtime, else
+      2. the repo's last-commit epoch from the git reflog, else
+      3. the goal's own updated_at ISO timestamp (last resort).
+    A goal with no resolvable ground truth ⇒ 'unknown' (NOT an error).
+
+    Returns {"momentum": "stalled"|"moving"|"unknown",
+             "stalled_days": <int or None>, "salience": <float>} where the
+    stalled salience > the moving salience (the neutral 'louder' weight —
+    ordering only, never imperative language). On ANY exception returns the
+    benign default _momentum_default(). NEVER raises into the read path.
+    """
+    try:
+        if now is None:
+            now = datetime.now(timezone.utc)
+        days_idle = _goal_mtime_days_idle(goal, repo_root, now)
+        if days_idle is None:
+            days_idle = _days_idle_from_epoch(
+                _last_commit_epoch(repo_root), now
+            )
+        if days_idle is None and isinstance(goal, dict):
+            days_idle = _days_idle_from_iso(
+                goal.get("updated_at") or goal.get("created_at"), now
+            )
+        if days_idle is None:
+            return _momentum_default()
+        if days_idle >= _STALLED_DAYS_THRESHOLD:
+            return {
+                "momentum": "stalled",
+                "stalled_days": int(days_idle),
+                "salience": _MOMENTUM_SALIENCE["stalled"],
+            }
+        return {
+            "momentum": "moving",
+            "stalled_days": None,
+            "salience": _MOMENTUM_SALIENCE["moving"],
+        }
+    except Exception:
+        return _momentum_default()
+
 
 def _effective_weight(row, now):
     """weight * 0.5 ** (days_idle / 7), days_idle from updated_at
@@ -303,11 +516,30 @@ def read_snapshot(db_path=None, include_decayed=False):
                 except (TypeError, ValueError):
                     pass  # non-numeric: include undecayed (defensive)
             concerns.append(concern)
+        # DRIVE-02: annotate each goal with READ-TIME momentum derived from
+        # ground truth (git reflog / file mtimes), mirroring _effective_weight's
+        # decay-at-read idiom. This makes momentum per-snapshot and fresh THIS
+        # turn — NOT staled behind debounced reflection (07-RESEARCH Pitfall
+        # #3). The whole annotation is wrapped so a velocity failure can never
+        # break read_snapshot's "None on any error, never raises" contract; on
+        # failure goals simply carry the benign 'unknown' default.
+        goals = _rows_as_dicts(conn, "goals")
+        try:
+            repo_root = _repo_root()
+            for goal in goals:
+                try:
+                    goal["momentum"] = goal_momentum(goal, repo_root, now)
+                except Exception:
+                    goal["momentum"] = _momentum_default()
+        except Exception:
+            for goal in goals:
+                goal.setdefault("momentum", _momentum_default())
         snapshot = {
             "schema_version": schema_version,
             "affect_summary": affect,
             "concerns": concerns,
             "contradictions": _rows_as_dicts(conn, "contradictions"),
+            "goals": goals,
             "trust_scores": {
                 key: value
                 for key, value in conn.execute("SELECT key, value FROM trust_scores")
@@ -479,6 +711,52 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                             " value=excluded.value",
                             (str(meta_key), str(meta_value)),
                         )
+                elif key == "goals_add":
+                    # MECHANICAL insert (DRIVE-01). status defaults to
+                    # 'candidate' (the INERT agent-nominated default — the
+                    # agent nominates, never mints); a user-minted goal passes
+                    # status='active' explicitly. Policy/validation is the
+                    # caller's job.
+                    for item in payload:
+                        conn.execute(
+                            "INSERT INTO goals"
+                            " (text, status, success_criteria, flagged_priority,"
+                            " domain, created_at, updated_at)"
+                            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            (
+                                item.get("text"),
+                                item.get("status", "candidate"),
+                                item.get("success_criteria"),
+                                item.get("flagged_priority", 0),
+                                item.get("domain"),
+                                now,
+                                now,
+                            ),
+                        )
+                elif key == "goals_update":
+                    # Absolute values, pre-validated by the caller.
+                    for item in payload:
+                        conn.execute(
+                            "UPDATE goals SET text=?, success_criteria=?,"
+                            " flagged_priority=?, domain=?, updated_at=?"
+                            " WHERE id=?",
+                            (
+                                item.get("text"),
+                                item.get("success_criteria"),
+                                item.get("flagged_priority", 0),
+                                item.get("domain"),
+                                now,
+                                item.get("id"),
+                            ),
+                        )
+                elif key == "goals_status":
+                    # The promotion path candidate->active (and back).
+                    for item in payload:
+                        conn.execute(
+                            "UPDATE goals SET status=?, updated_at=?"
+                            " WHERE id=?",
+                            (item.get("status"), now, item.get("id")),
+                        )
                 elif key == "trust_scores":
                     for score_key, score_value in payload.items():
                         conn.execute(
@@ -512,7 +790,7 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
             # Enforce caps inside the SAME transaction: evict oldest rows
             # (lowest id) beyond each cap; trust_scores evicts oldest
             # updated_at beyond its cap.
-            for table in ("concerns", "contradictions", "turn_log"):
+            for table in ("concerns", "contradictions", "turn_log", "goals"):
                 conn.execute(
                     "DELETE FROM {t} WHERE id NOT IN"
                     " (SELECT id FROM {t} ORDER BY id DESC LIMIT ?)".format(t=table),

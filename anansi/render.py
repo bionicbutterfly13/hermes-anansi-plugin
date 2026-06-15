@@ -122,7 +122,248 @@ _TRUST_HINT_THRESHOLD = 0.4
 _MAX_TRUST_HINTS = 2
 
 
-def render_block(signals, snapshot=None) -> Optional[str]:
+# DRIVE-02: neutral momentum salience (stalled LOUDER than moving than
+# unknown) — ORDERING only, never imperative loudness. Pressure metadata may
+# ADD to a goal's salience for ordering, but the neutral momentum read stays
+# separate and inspectable (the stalled-days clause is unchanged; the drive
+# effect renders as its own "[push]" reason clause).
+_MOMENTUM_RANK = {"stalled": 2, "moving": 1, "unknown": 0}
+# A user-authorized push zone for a stalled goal raises ITS ordering rank
+# above an unauthorized stalled goal — a visible drive effect, kept separate
+# from the neutral stalled rank above.
+_PUSH_SALIENCE_BONUS = 10
+
+
+def _drive_salience(item) -> float:
+    """Neutral momentum salience PLUS any user-authorized pressure bonus —
+    used ONLY for ordering. The neutral read is recoverable from the
+    stalled_days field (unchanged); the bonus is recoverable from the
+    push metadata, so the two effects remain inspectable/separate."""
+    if not isinstance(item, dict):
+        return 0.0
+    stalled_days = item.get("stalled_days")
+    momentum = "stalled" if isinstance(stalled_days, int) else item.get("momentum")
+    rank = _MOMENTUM_RANK.get(momentum, 0)
+    bonus = 0
+    if rank >= _MOMENTUM_RANK["stalled"] and _push_when_stalled(item):
+        bonus = _PUSH_SALIENCE_BONUS
+    try:
+        confidence = float(item.get("confidence") or 0.0)
+    except (TypeError, ValueError):
+        confidence = 0.0
+    # rank dominates; the push bonus dominates within-rank; confidence breaks
+    # remaining ties.
+    return rank + bonus + min(max(confidence, 0.0), 1.0)
+
+
+def _push_when_stalled(item) -> bool:
+    """True when the goal_signals item carries user-authorized firmer-support
+    metadata for a stalled goal (DRIVE anti-complacency, 07-RESEARCH Pitfall
+    #9). Defensive: any non-truthy/absent value reads as no push."""
+    if not isinstance(item, dict):
+        return False
+    if item.get("push_when_stalled"):
+        return True
+    style = str(item.get("support_style", "") or "").strip().lower()
+    return style in ("firm", "push", "firmer")
+
+
+def enrich_goal_signals(goal_signals, goals):
+    """Ground each parsed goal_signal in the matching persisted goal's
+    READ-TIME momentum (DRIVE-02) so the stalled signal is anchored to ground
+    truth, not solely to whether the model echoed stalled_days.
+
+    For each signal, find a persisted goal whose text matches relates_to_goal
+    (case-insensitive substring either direction) and, when that goal reads
+    'stalled', attach its neutral stalled_days plus any user-authorized
+    pressure metadata (support_style/push_when_stalled). The neutral momentum
+    and the pressure effect stay as SEPARATE inspectable fields. Pure,
+    defensive, never raises — returns the (possibly enriched) list.
+    """
+    try:
+        signals = [g for g in (goal_signals or []) if isinstance(g, dict)]
+        goal_list = [g for g in (goals or []) if isinstance(g, dict)]
+        if not signals or not goal_list:
+            return signals
+        for sig in signals:
+            relates = str(sig.get("relates_to_goal", "") or "").strip().lower()
+            if not relates:
+                continue
+            match = None
+            for goal in goal_list:
+                text = str(goal.get("text", "") or "").strip().lower()
+                if text and (text in relates or relates in text):
+                    match = goal
+                    break
+            if match is None:
+                continue
+            momentum = match.get("momentum")
+            if not isinstance(momentum, dict):
+                continue
+            sig["momentum"] = momentum.get("momentum")
+            days = momentum.get("stalled_days")
+            # Only attach the neutral stalled_days when the goal actually reads
+            # stalled (moving/unknown carry no days clause). Don't overwrite a
+            # model-supplied value with None.
+            if isinstance(days, int) and "stalled_days" not in sig:
+                sig["stalled_days"] = days
+            # User-authorized pressure metadata (kept separate from the
+            # neutral momentum above) — copied through for ordering + the
+            # inspectable drive-effect clause.
+            if match.get("support_style") is not None:
+                sig["support_style"] = match.get("support_style")
+            if match.get("push_when_stalled") is not None:
+                sig["push_when_stalled"] = match.get("push_when_stalled")
+            # DRIVE-05: carry the user-flagged priority through so a matching
+            # signal is recognized as flagged. (The never-omit guarantee in
+            # render_block reads the PERSISTED goals directly, so a flagged
+            # goal surfaces even when the model omitted its signal — this just
+            # keeps the enriched signal's flagged state consistent.)
+            if match.get("flagged_priority") is not None:
+                sig["flagged_priority"] = match.get("flagged_priority")
+        return signals
+    except Exception:
+        return [g for g in (goal_signals or []) if isinstance(g, dict)]
+
+
+def _order_goal_signals(goal_signals):
+    """Stable descending order by drive salience: stalled (then user-pushed
+    stalled) first, moving next, unknown last. Stable so equal-salience
+    signals keep their input order."""
+    items = [g for g in (goal_signals or []) if isinstance(g, dict)]
+    return sorted(items, key=_drive_salience, reverse=True)
+
+
+def _render_drive_note(item) -> str:
+    """One observational, THIRD-PERSON drive note. Includes the neutral
+    "stalled N days" clause when present, and — SEPARATELY — a "[push]" drive
+    effect clause when user-authorized pressure raised this goal's salience
+    (the neutral read and the drive effect stay inspectable, 07-RESEARCH
+    Pitfall #9). Never imperative."""
+    relates = _sanitize_text(item.get("relates_to_goal", ""), 300)
+    stalled_days = item.get("stalled_days")
+    parts = ["relates to %s" % relates]
+    if isinstance(stalled_days, int):
+        parts.append("stalled %d days" % stalled_days)
+        if _push_when_stalled(item):
+            # The drive effect, rendered SEPARATELY so it is inspectable —
+            # observational tag, not an instruction.
+            parts.append("[push zone: user-authorized firmer support]")
+    parts.append("(confidence %s)" % _fmt(item.get("confidence")))
+    return "- drive note: " + " — ".join(parts[:-1]) + " " + parts[-1]
+
+
+def _is_flagged(item) -> bool:
+    """True when this goal/goal_signal carries a user-flagged priority
+    (DRIVE-05). Defensive: any truthy flagged_priority reads as flagged."""
+    if not isinstance(item, dict):
+        return False
+    value = item.get("flagged_priority")
+    try:
+        return int(value) > 0
+    except (TypeError, ValueError):
+        return bool(value)
+
+
+def _want_text(item) -> str:
+    """The goal text to voice in the first person. A goal_signal names the
+    goal in relates_to_goal; a persisted goal carries text. Either way the
+    text is sanitized (injection patterns still apply — SAFE-04 first-person
+    carve-out does NOT relax the injection scan or the second-person
+    directive quoting)."""
+    raw = item.get("relates_to_goal") or item.get("text") or ""
+    return _sanitize_text(raw, 300)
+
+
+def _resolve_stalled_days(item):
+    """The neutral days-idle count from either shape: a top-level
+    ``stalled_days`` (an enriched goal_signal) or the nested
+    ``momentum.stalled_days`` (a persisted goal from read_snapshot). Returns an
+    int or None. Defensive; never raises."""
+    if not isinstance(item, dict):
+        return None
+    direct = item.get("stalled_days")
+    if isinstance(direct, int):
+        return direct
+    momentum = item.get("momentum")
+    if isinstance(momentum, dict):
+        nested = momentum.get("stalled_days")
+        if isinstance(nested, int):
+            return nested
+    return None
+
+
+def _render_drive_want(item) -> str:
+    """One FIRST-PERSON owned-want line (DRIVE-04): the drive layer voices the
+    agent's want as "I want <goal> ...". This is a NEW allowlisted label, NOT
+    a loosening of the second-person directive scan: a genuine first-person
+    "I want" line never matches `_SECOND_PERSON_DIRECTIVE_RE` (which only
+    matches "you should|must|...") so it passes through `_sanitize_text`
+    unquoted. The goal text is still sanitized for injection patterns; were a
+    second-person directive smuggled into the goal text, `_sanitize_text`
+    would quote the whole field as reported material (SAFE-03 still applies).
+
+    Anti-complacency (DRIVE-05): a stalled goal that the user authorized for
+    firmer support renders a VISIBLE under-support/drive-effect note rather
+    than a quiet low-pressure line — the consequence is surfaced, never
+    hidden. The neutral "stalled N days" read stays SEPARATE from the
+    inspectable "[under-support: ...]" drive-effect clause (Pitfall #9)."""
+    want = _want_text(item)
+    stalled_days = _resolve_stalled_days(item)
+    clause = "I want progress on %s" % want
+    if isinstance(stalled_days, int):
+        clause = "I want %s moving (stalled %d days)" % (want, stalled_days)
+        if _push_when_stalled(item):
+            # The drive effect is rendered as a SEPARATE, visible clause: a
+            # stalled user-authorized push goal must never be quietly rendered
+            # as low pressure (anti-complacency). Observational tag, first
+            # person, not an instruction.
+            clause += " [under-support: user-authorized firmer support]"
+    return "- drive want: %s" % clause
+
+
+def _flagged_want_lines(goal_signals, goals):
+    """The first-person `- drive want:` lines for user-flagged priorities
+    (DRIVE-05 never-omit). Built from the PERSISTED goals, not solely the
+    model's goal_signals: a flagged goal must surface even when the model
+    omitted it. Each flagged persisted goal yields one want line; if a parsed
+    goal_signal matches it (carrying enriched stalled_days), that richer signal
+    is used so the want line keeps the neutral momentum read. Deterministic and
+    deduplicated. Pure, never raises — returns a list (possibly empty)."""
+    try:
+        gsignals = [g for g in (goal_signals or []) if isinstance(g, dict)]
+        plist = [g for g in (goals or []) if isinstance(g, dict)]
+        lines = []
+        seen = set()
+        for goal in plist:
+            if not _is_flagged(goal):
+                continue
+            text = str(goal.get("text", "") or "").strip()
+            if not text:
+                continue
+            key = text.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            # Prefer the matching enriched goal_signal (it carries stalled_days
+            # + pressure metadata grounded at read time); fall back to the
+            # persisted goal so a model omission cannot drop a flagged want.
+            source = goal
+            for sig in gsignals:
+                relates = str(sig.get("relates_to_goal", "") or "").strip().lower()
+                if relates and (relates in key or key in relates):
+                    merged = dict(goal)
+                    merged.update(sig)
+                    source = merged
+                    break
+            lines.append(_render_drive_want(source))
+        return lines
+    except Exception:
+        return []
+
+
+def render_block(signals, snapshot=None, goals=None,
+                 energy_budget=None) -> Optional[str]:
     """Render the sanitized [anansi appraisal] block, or None (APPR-04/05).
 
     Top-3 per category, observational phrasing, every interpolated text
@@ -134,6 +375,22 @@ def render_block(signals, snapshot=None) -> Optional[str]:
     (REFL-05 — never a gate). Empty-signal suppression is UNCHANGED and
     takes precedence: hints ride along only when a block already renders
     (APPR-05 holds); hint lines participate in the existing token cap.
+
+    ``goals`` (DRIVE-05, Phase 7) is the persisted goals slice. User-flagged
+    priorities (``flagged_priority``) render a FIRST-PERSON `- drive want:`
+    line at the TOP of the block (right after the sentinel + framing) and are
+    EXEMPT from both the per-category `[:3]` slice and the token-cap
+    trailing-line-drop — a flagged priority is NEVER silently omitted (the
+    drive red line). Empty-signal suppression (APPR-05) still takes precedence:
+    a flagged goal does NOT manufacture a block when there are zero signals;
+    it only guarantees visibility WHEN a block already renders.
+
+    ``energy_budget`` (DRIVE-06, Phase 7) is the per-turn energy/attention cap
+    on how many NON-flagged drive lines (`- drive note:`) surface this turn.
+    None ⇒ no cap (07-01..03 behaviour). A flagged-priority `- drive want:`
+    line is EXEMPT (never-omit beats the budget — DRIVE-05 > DRIVE-06):
+    the budget only trims the non-flagged drive notes, never the protected
+    flagged prefix. Fail-open: a malformed budget falls back to no cap.
     """
     if not isinstance(signals, dict):
         return None
@@ -141,13 +398,35 @@ def render_block(signals, snapshot=None) -> Optional[str]:
     observations = signals.get("salient_observations") or []
     contradictions = signals.get("contradiction_flags") or []
     searches = signals.get("suggested_memory_searches") or []
+    goal_signals = signals.get("goal_signals") or []
     gut = str(signals.get("gut_reaction") or "").strip()
 
-    # Empty-signal suppression FIRST: no block, no header (APPR-05).
-    if not (instincts or observations or contradictions or searches or gut):
+    # Empty-signal suppression FIRST: no block, no header (APPR-05). A flagged
+    # goal does NOT manufacture a block — surfacing rides a block that already
+    # renders from real appraisal signals; it never forces one.
+    if not (instincts or observations or contradictions or searches
+            or goal_signals or gut):
         return None
 
+    # DRIVE-05 never-omit: flagged-priority want lines render FIRST, directly
+    # after SENTINEL + FRAMING, so they sit OUTSIDE the truncation pop range
+    # (the cap loop below pops from the tail and stops at protected_count).
+    flagged_wants = _flagged_want_lines(goal_signals, goals)
+    # The persisted-goal texts already voiced as first-person want lines — used
+    # to skip re-rendering the same goal as a THIRD-PERSON `- drive note:` below
+    # (no duplicate, and the flagged item is never the dropped 4th note).
+    flagged_goal_texts = {
+        str(g.get("text", "") or "").strip().lower()
+        for g in (goals or [])
+        if isinstance(g, dict) and _is_flagged(g) and g.get("text")
+    }
+
     lines = [SENTINEL, FRAMING]
+    lines.extend(flagged_wants)
+    # Everything from here on is droppable tail; flagged want lines above are
+    # the protected prefix and are never popped.
+    protected_count = len(lines)
+
     for item in instincts[:3]:
         lines.append(
             "- instinct: %s (%s) — %s"
@@ -174,6 +453,39 @@ def render_block(signals, snapshot=None) -> Optional[str]:
                 _fmt(item.get("confidence")),
             )
         )
+    # DRIVE-02/03: observational goal-relation notes, ordered LOUDEST-FIRST.
+    # "Louder" is SALIENCE/ORDERING, never imperative language (SAFE-04 +
+    # reactance research, 07-RESEARCH external note): a stalled goal renders
+    # BEFORE a moving one. THIRD-PERSON `- drive note:` here; flagged goals are
+    # ALREADY voiced FIRST-PERSON `- drive want:` at the TOP (DRIVE-05) so they
+    # are skipped here — no duplicate, and the per-category `[:3]` slice below
+    # can never drop a flagged item (it is not in this list). The stalled-days
+    # clause is a neutral elapsed-time observation; pressure may raise a goal's
+    # salience but the neutral observation stays intact and the drive effect is
+    # a separate, inspectable clause.
+    non_flagged_signals = []
+    for item in _order_goal_signals(goal_signals):
+        relates = str(item.get("relates_to_goal", "") or "").strip().lower()
+        if relates and any(
+            relates in t or t in relates for t in flagged_goal_texts
+        ):
+            continue  # already rendered as a protected first-person want line
+        non_flagged_signals.append(item)
+    # DRIVE-06 energy budget: the per-category ceiling is the standing top-3.
+    # When an energy_budget is supplied it FURTHER caps the number of NON-flagged
+    # drive notes (`min(3, budget)`); a budget of 0 surfaces no non-flagged drive
+    # note at all. Flagged `- drive want:` lines were already emitted into the
+    # protected prefix above and are NOT in this list, so the budget can never
+    # drop them (never-omit beats the budget — DRIVE-05 > DRIVE-06). Fail-open:
+    # a non-int budget leaves the standing top-3 ceiling in place.
+    note_limit = 3
+    try:
+        if energy_budget is not None:
+            note_limit = max(0, min(3, int(energy_budget)))
+    except (TypeError, ValueError):
+        note_limit = 3
+    for item in non_flagged_signals[:note_limit]:
+        lines.append(_render_drive_note(item))
     if searches:
         quoted = "; ".join(
             "'%s'" % _sanitize_text(s, 100) for s in searches[:3]
@@ -202,8 +514,16 @@ def render_block(signals, snapshot=None) -> Optional[str]:
             )
 
     # Cap: drop trailing whole lines until <= ~500 tokens (2000 chars).
+    # DRIVE-05 never-omit: the pop NEVER reaches the protected prefix
+    # (SENTINEL + FRAMING + flagged `- drive want:` lines). The guard stops at
+    # max(protected_count, 2) so a flagged priority is never the dropped
+    # trailing line — never-omit BEATS the soft token cap. If the protected
+    # prefix ALONE already exceeds the cap, we accept a slightly-over-cap block
+    # rather than drop a flagged want: the never-omit invariant is a hard
+    # guarantee; the ~500-token cap is a soft target.
+    floor = max(protected_count, 2)
     block = "\n".join(lines)
-    while len(block) // 4 > _MAX_BLOCK_TOKENS and len(lines) > 2:
+    while len(block) // 4 > _MAX_BLOCK_TOKENS and len(lines) > floor:
         lines.pop()
         block = "\n".join(lines)
     return block

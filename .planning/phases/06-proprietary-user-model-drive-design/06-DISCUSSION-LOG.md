@@ -83,3 +83,21 @@ never-omit invariant).
 ## Deferred ideas
 - Heartbeat execution mechanism; proactive-notify (L2); worldview / episode / user-dopamine /
   reconsolidation internals; desktop config panel.
+
+## Addendum: Adjustable pressure + anti-complacency (2026-06-14)
+
+Dr. Mani asked whether the drive could be adjustable and inspectable so the agent does not fall into
+complacency when stronger support is needed.
+
+- **Decision:** Drive pressure is adjustable and inspectable. The drive may alter salience, urgency,
+  persistence, and surfacing priority, but not truth, goal ownership, evidence, or omission rules.
+- **Decision:** The first in-turn implementation carries a pressure ladder (`quiet` / `standard` /
+  `firm`). A `code-red` lane remains deferred to heartbeat/interruption planning and still requires
+  user-defined objective triggers.
+- **Decision:** The surface must expose drive consequences: neutral read, drive read, and drive
+  effect. Drive impact must not be hidden inside unstated model judgment.
+- **Decision:** Anti-complacency is part of the safety model. User-authorized push zones
+  (`support_style`, `push_when_stalled`, thresholds) prevent stalled high-priority goals from being
+  quietly downranked. Repeated under-response should flag possible under-support.
+- **Phase split:** Phase 6 records the principle; Phase 7 implements the first in-turn version.
+  Heartbeat-level code-red and multi-session under-response auditing remain later.

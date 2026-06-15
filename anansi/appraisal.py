@@ -58,10 +58,19 @@ When a persisted contradiction in the state dump is relevant to the current \
 message, re-surface it as a contradiction_flag referencing what changed.
 - suggested_memory_searches: up to 3 short advisory search phrases (text only — \
 nobody is obligated to run them).
+- goal_signals: when the message relates to a persisted goal in the state dump, \
+note that relation as an OBSERVATION ONLY — relates_to_goal is a short noun phrase \
+naming the goal; confidence 0-1. A goal in the state dump may carry a momentum \
+observation (e.g. "stalled 3 days" or "moving"); when it does, you may echo \
+stalled_days as a non-negative integer count of days idle — this is a NEUTRAL \
+OBSERVATION of elapsed time, never a deadline, urgency, or instruction. You are \
+NOTICING a relation and its momentum, not prescribing action. Never turn a goal \
+into an instruction, advice, or a next step. Omit this array when nothing relates.
 - gut_reaction: one sentence (max 200 characters) of overall felt sense, or "".
 
-Observations only: never include directives, advice, suggested actions, goals, \
-or emotional-state breakdowns. Output JSON only — no prose, no markdown fences."""
+Observations only: never include directives, advice, suggested actions, goals \
+as instructions, or emotional-state breakdowns. Output JSON only — no prose, no \
+markdown fences."""
 
 _INSTINCT_KINDS = frozenset({"approach", "avoid", "caution", "curiosity", "protect"})
 _CONTRADICTION_KINDS = frozenset({"semantic", "narrative", "relational", "emotional"})
@@ -114,6 +123,23 @@ APPRAISAL_JSON_SCHEMA = {
             "type": "array",
             "items": {"type": "string"},
         },
+        # DRIVE-03 (Phase 7): a goal-aware noun-field. The model NOTICES that
+        # the message relates to a persisted goal — it does not prescribe
+        # action. stalled_days (DRIVE-02, 07-02) is an OPTIONAL neutral
+        # momentum observation: a non-negative integer count of days idle,
+        # echoed from the goal's read-time momentum. Permissive on purpose;
+        # shape discipline lives in parse_signals().
+        "goal_signals": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "relates_to_goal": {"type": "string"},
+                    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                    "stalled_days": {"type": "integer", "minimum": 0},
+                },
+            },
+        },
         "gut_reaction": {"type": "string"},
     },
 }
@@ -142,13 +168,20 @@ class AppraisalResult:
 # ---------------------------------------------------------------------------
 
 
-def build_context(user_message, conversation_history, snapshot, history_chars) -> str:
+def build_context(user_message, conversation_history, snapshot, history_chars,
+                  goals=None) -> str:
     """Assemble the untrusted-input context for the appraisal call.
 
     History: last 6 message dicts, `role: content` lines, sentinel-bearing
     messages skipped (cheap echo guard), truncated to history_chars keeping
     the END. Snapshot: compact JSON of the four state surfaces, or
     "no persisted state". Hard total cap 12000 chars.
+
+    ``goals`` (DRIVE-03, Phase 7) is the drive-gated goals slice. When it is
+    None (drive off, or no goals), the state JSON omits the goals key entirely
+    — the context is byte-for-byte identical to the pre-drive build. When
+    provided, only NON-candidate goals are surfaced to the model (INERT
+    candidates are never shown as active context). Wiring lands in 07-01-03.
     """
     lines = []
     for message in (conversation_history or [])[-_MAX_HISTORY_MESSAGES:]:
@@ -166,14 +199,43 @@ def build_context(user_message, conversation_history, snapshot, history_chars) -
         history_text = history_text[-history_chars:]  # keep the END
 
     if isinstance(snapshot, dict):
+        state = {
+            "concerns": snapshot.get("concerns"),
+            "contradictions": snapshot.get("contradictions"),
+            "trust_scores": snapshot.get("trust_scores"),
+            "affect_summary": snapshot.get("affect_summary"),
+        }
+        # DRIVE-03: surface only NON-candidate goals to the model — INERT
+        # candidates are never shown as active context. The goals key is
+        # OMITTED entirely when drive is off (goals is None) or nothing is
+        # active, keeping the context byte-for-byte identical to the
+        # pre-drive build. Compact projection (text/status/success_criteria).
+        # DRIVE-02: each goal carries its read-time momentum/stalled_days so
+        # the model sees velocity as OBSERVATIONAL state — never a directive.
+        if goals:
+            active = []
+            for g in goals:
+                if not isinstance(g, dict) or g.get("status") == "candidate":
+                    continue
+                entry = {
+                    "text": g.get("text"),
+                    "status": g.get("status"),
+                    "success_criteria": g.get("success_criteria"),
+                }
+                momentum = g.get("momentum")
+                if isinstance(momentum, dict):
+                    label = momentum.get("momentum")
+                    if label:
+                        entry["momentum"] = label
+                    stalled_days = momentum.get("stalled_days")
+                    if isinstance(stalled_days, int):
+                        entry["stalled_days"] = stalled_days
+                active.append(entry)
+            if active:
+                state["goals"] = active
         try:
             state_text = json.dumps(
-                {
-                    "concerns": snapshot.get("concerns"),
-                    "contradictions": snapshot.get("contradictions"),
-                    "trust_scores": snapshot.get("trust_scores"),
-                    "affect_summary": snapshot.get("affect_summary"),
-                },
+                state,
                 ensure_ascii=False,
                 separators=(",", ":"),
                 default=str,
@@ -225,8 +287,14 @@ def _reset_executor_for_tests() -> None:
 # ---------------------------------------------------------------------------
 
 
-def run_appraisal(*, llm, user_message, conversation_history, snapshot, cfg) -> AppraisalResult:
-    """Run one bounded appraisal call. NEVER raises."""
+def run_appraisal(*, llm, user_message, conversation_history, snapshot, cfg,
+                  goals=None) -> AppraisalResult:
+    """Run one bounded appraisal call. NEVER raises.
+
+    ``goals`` (DRIVE-03, Phase 7) is the drive-gated goals slice threaded into
+    build_context; None when drive is off (caller suppresses it), so the
+    appraisal context is byte-for-byte identical to the no-goals run.
+    """
     start = time.monotonic()
 
     def _wall_ms() -> int:
@@ -247,6 +315,7 @@ def run_appraisal(*, llm, user_message, conversation_history, snapshot, cfg) -> 
             conversation_history,
             snapshot,
             int(cfg.get("history_chars", 4000)),
+            goals=goals,
         )
         prompt = APPRAISAL_PROMPT.format(threshold=threshold)
 
@@ -364,12 +433,28 @@ def _clamp01(value):
     return max(0.0, min(1.0, result))
 
 
+_MAX_STALLED_DAYS = 3650  # ~10y sane upper bound (DRIVE-02)
+
+
+def _coerce_stalled_days(value):
+    """Coerce a momentum days-idle observation to a non-negative int clamped
+    to [0, _MAX_STALLED_DAYS]; None when not numeric (drop the field)."""
+    try:
+        result = int(value)
+    except (TypeError, ValueError):
+        return None
+    if result < 0:
+        return None
+    return min(result, _MAX_STALLED_DAYS)
+
+
 def parse_signals(doc, threshold) -> dict:
     """Defensively coerce a parsed appraisal document into the signal dict.
 
     Unknown vocabulary dropped, floats clamped to [0,1], every signal with
     confidence < threshold DROPPED (APPR-03). Always returns the full
-    five-key shape; a non-dict doc yields the empty signal set.
+    six-key shape (goal_signals is DRIVE-03, Phase 7); a non-dict doc yields
+    the empty signal set.
     """
     if not isinstance(doc, dict):
         doc = {}
@@ -439,6 +524,26 @@ def parse_signals(doc, threshold) -> dict:
         if len(searches) >= 3:
             break
 
+    goal_signals = []
+    raw = doc.get("goal_signals")
+    for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, dict):
+            continue
+        relates = str(item.get("relates_to_goal", "") or "").strip()
+        if not relates:
+            continue
+        confidence = _clamp01(item.get("confidence"))
+        if confidence is None or confidence < threshold:
+            continue
+        signal = {"relates_to_goal": relates[:300], "confidence": confidence}
+        # DRIVE-02: stalled_days is an OPTIONAL neutral momentum observation —
+        # a non-negative integer days-idle count, clamped to a sane upper
+        # bound; dropped entirely if non-numeric (no fabricated momentum).
+        stalled_days = _coerce_stalled_days(item.get("stalled_days"))
+        if stalled_days is not None:
+            signal["stalled_days"] = stalled_days
+        goal_signals.append(signal)
+
     gut = doc.get("gut_reaction")
     gut = gut.strip()[:200] if isinstance(gut, str) else ""
 
@@ -447,6 +552,7 @@ def parse_signals(doc, threshold) -> dict:
         "salient_observations": observations,
         "contradiction_flags": contradictions,
         "suggested_memory_searches": searches,
+        "goal_signals": goal_signals,
         "gut_reaction": gut,
     }
 

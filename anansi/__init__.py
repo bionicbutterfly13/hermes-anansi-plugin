@@ -31,6 +31,57 @@ _ctx = None
 _session_state = {"session_id": None, "last_msg_norm": None}
 
 
+def _filter_goals_by_domain(goals, drive_domains):
+    """DRIVE-06 containment: keep only goals whose ``domain`` is in the
+    whitelist when the whitelist is NON-empty; an empty whitelist means NO
+    restriction (07-01..03 behaviour unchanged). Fail-open: any failure
+    returns the UNFILTERED goals (a filter bug must never crash the hook or
+    silently drop everything)."""
+    try:
+        if not goals or not drive_domains:
+            return goals
+        allowed = {str(d).strip() for d in drive_domains if str(d).strip()}
+        if not allowed:
+            return goals
+        kept = [
+            g for g in goals
+            if isinstance(g, dict) and str(g.get("domain") or "").strip() in allowed
+        ]
+        return kept
+    except Exception:
+        return goals
+
+
+def _filter_signals_by_goals(goal_signals, goals, drive_domains):
+    """DRIVE-06 containment: when the domain whitelist is ACTIVE, drop any model
+    ``goal_signals`` that do not relate to a surviving (whitelisted) persisted
+    goal. This stops an off-domain goal the model echoed from leaking into the
+    surfaced goal-aware fields even though it was filtered out of the appraisal
+    context. An EMPTY whitelist leaves the signals untouched (07-01..03
+    behaviour unchanged). Fail-open: any failure returns the unfiltered signals.
+    """
+    try:
+        if not drive_domains or not goal_signals:
+            return goal_signals
+        texts = [
+            str(g.get("text") or "").strip().lower()
+            for g in (goals or [])
+            if isinstance(g, dict) and str(g.get("text") or "").strip()
+        ]
+        if not texts:
+            return []  # whitelist active but no whitelisted goal -> none surface
+        kept = []
+        for sig in goal_signals:
+            if not isinstance(sig, dict):
+                continue
+            relates = str(sig.get("relates_to_goal") or "").strip().lower()
+            if relates and any(relates in t or t in relates for t in texts):
+                kept.append(sig)
+        return kept
+    except Exception:
+        return goal_signals
+
+
 def _fail_open(fn):
     """Wrap a hook so any exception is logged and swallowed (returns None).
 
@@ -107,6 +158,14 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
         store.record_telemetry("skipped:disabled", session_id=session_id)
         return None
 
+    # The SEPARATE drive kill switch (DRIVE-06). Checked AFTER the appraisal
+    # kill switch and does NOT early-return: appraisal still runs unchanged
+    # when drive is off — only the goal-aware contribution is suppressed
+    # (build_context omits the goals slice, render omits goal lines). The
+    # skipped:drive_disabled telemetry row (a non-failure skipped:* prefix)
+    # is recorded once per ELIGIBLE turn, below, where appraisal actually runs.
+    drive_on = cfg.get("drive_enabled", True)
+
     if session_id != _session_state["session_id"]:  # session rollover guard
         _session_state["session_id"] = session_id
         _session_state["last_msg_norm"] = None
@@ -123,12 +182,28 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
         store.record_telemetry("skipped:no_ctx", session_id=session_id)
         return None
 
+    # DRIVE-06: once per ELIGIBLE turn, note the drive-off state as a
+    # non-failure skipped:* row. goals stays None so build_context omits the
+    # goals slice and render omits goal lines — appraisal otherwise unchanged.
+    if drive_on:
+        goals = (snapshot or {}).get("goals") or []
+        # DRIVE-06 containment control 2: the domain WHITELIST. When
+        # drive_domains is non-empty, only goals in a user-named domain reach
+        # appraisal/render; an empty whitelist (the default) imposes no
+        # restriction. Fail-open: a filter failure falls back to the unfiltered
+        # goals rather than crashing or silently dropping a flagged priority.
+        goals = _filter_goals_by_domain(goals, cfg.get("drive_domains") or [])
+    else:
+        goals = None
+        store.record_telemetry("skipped:drive_disabled", session_id=session_id)
+
     result = appraisal.run_appraisal(
         llm=_ctx.llm,
         user_message=user_message,
         conversation_history=conversation_history or [],
         snapshot=snapshot,
         cfg=cfg,
+        goals=goals,
     )
 
     store.record_telemetry(  # before returning; single quick INSERT, fail-open
@@ -143,9 +218,43 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
 
     if result.signals is None:
         return None
+    # DRIVE-06: when the drive is off, suppress goal-aware fields at render
+    # too — a faithful model returns no goal_signals (build_context omitted
+    # the goals slice), but stripping here makes the drive-off block
+    # byte-for-byte identical to a no-goals run regardless of model output.
+    if not drive_on and result.signals.get("goal_signals"):
+        result.signals["goal_signals"] = []
+    # DRIVE-02: when drive is on, ground each goal_signal in the matching
+    # persisted goal's READ-TIME momentum (stalled_days + any pressure
+    # metadata) so the stalled signal is anchored to ground truth — render
+    # then orders stalled goals first. Pure + fail-open; no-op when no goals.
+    elif drive_on and result.signals.get("goal_signals"):
+        # DRIVE-06: when the domain whitelist is active, drop any echoed
+        # goal_signal that does not relate to a surviving (whitelisted)
+        # persisted goal — an off-domain goal must not leak back through the
+        # model's echo. No-op when the whitelist is empty (default).
+        gsignals = _filter_signals_by_goals(
+            result.signals["goal_signals"], goals, cfg.get("drive_domains") or []
+        )
+        result.signals["goal_signals"] = render.enrich_goal_signals(
+            gsignals, goals
+        )
     # snapshot rides along for REFL-05 trust hints (advisory only; empty-
     # signal suppression inside render_block still takes precedence).
-    block = render.render_block(result.signals, snapshot=snapshot)
+    # DRIVE-05: the persisted goals (with flagged_priority) ride along too so a
+    # user-flagged priority is NEVER silently omitted from the surfaced block
+    # (it renders FIRST and outside the truncation pop range). goals is None
+    # when drive is off, so the drive-off block stays byte-for-byte identical.
+    # DRIVE-06 containment control 3: the per-turn ENERGY BUDGET caps how many
+    # NON-flagged drive lines surface this turn. A flagged-priority want is
+    # EXEMPT (never-omit, DRIVE-05 > DRIVE-06) — the cap is applied inside
+    # render_block, after the protected flagged prefix is assembled, so a
+    # flagged want is never dropped to satisfy the budget. None ⇒ no cap.
+    energy_budget = cfg.get("drive_energy_budget") if drive_on else None
+    block = render.render_block(
+        result.signals, snapshot=snapshot, goals=goals,
+        energy_budget=energy_budget,
+    )
     if block is None:  # empty-signal suppression (APPR-05)
         return None
 

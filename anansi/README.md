@@ -23,6 +23,36 @@ The plugin **never**:
 - runs schedulers, timers, or background daemons — all work happens inside the four
   registered hooks
 
+## Drive / accountability (Phase 7)
+
+The drive layer is an OBSERVATIONAL accountability surface for user-minted goals —
+not an autonomy feature. It stays inside the same fail-open, no-autonomy envelope
+as the rest of the plugin:
+
+- **User-minted goals only.** The agent may NOMINATE inert goal *candidates*
+  (`status='candidate'`), but it never mints an active goal — a goal becomes
+  active only through a user-authorized status promotion. Candidates are never
+  surfaced as active context.
+- **Grounded, read-time velocity.** A goal's momentum (`stalled N days` /
+  `moving` / `unknown`) is derived from GROUND TRUTH at appraisal-read time
+  (git reflog/file mtimes via stdlib reads only — no shell-out, no git library).
+  A stalled goal renders LOUDER only in the sense of SALIENCE/ORDERING (it
+  renders first), never through imperative language.
+- **First-person want voice, second-person still neutralized.** A flagged/owned
+  goal may be voiced in the first person ("I want X moving (stalled N days)") as
+  an `- drive want:` line. This is a label ALLOWANCE only — the second-person
+  directive scan is UNCHANGED, so a "you should/must …" directive smuggled into
+  goal text is still quoted as reported material.
+- **The never-omit invariant.** A user-flagged priority is NEVER silently
+  dropped: it renders first, is exempt from the per-category slice and the
+  token-cap line-drop, and is read from PERSISTED goal state (not model output),
+  so it surfaces even when the model omits it. The domain whitelist and the
+  energy budget (above) NEVER drop a flagged want — never-omit beats both.
+
+Tone is observational throughout; the layer surfaces relations and elapsed time,
+it does not prescribe action, set deadlines, or push proactively (in-turn only —
+heartbeat and code-red interruption are out of scope for this phase).
+
 ## Install — standalone
 
 Copy **or** symlink this directory to `$HERMES_HOME/plugins/anansi`, then
@@ -77,6 +107,10 @@ plugins:
       reflect_every_n_turns: 5       # int, clamped [1, 50] — debounce between reflections
       reflect_max_tokens: 700        # int, >= 1 — reflection completion budget
       reflect_deadline_seconds: 8.0  # float, clamped [0.5, 10.0] — reflection wall-clock bound
+      drive_enabled: true            # SEPARATE drive kill switch — false stops goal-aware fields; appraisal unchanged
+      drive_domains: []              # domain WHITELIST; non-empty ⇒ only goals in these domains surface; [] = unrestricted
+      drive_energy_budget: 3         # int, floor 0 — max NON-flagged drive lines/turn; flagged wants are exempt
+      drive_pressure: standard       # quiet|standard|firm — how firm the drive may become (code-red excluded)
       llm:
         model: claude-haiku-4-5      # optional model override; default: none (host's active model)
 ```
@@ -85,6 +119,33 @@ Notes:
 
 - `enabled: false` is the kill switch — the plugin records a `skipped:disabled`
   telemetry row and injects nothing.
+
+### Drive containment controls (Phase 7, DRIVE-06)
+
+The drive layer (see the next section) is contained and adjustable through three
+config keys, all under `plugins.entries.anansi`, all fail-open to safe defaults:
+
+- **`drive_enabled`** (bool, default `true`) — a SEPARATE kill switch from
+  `enabled`. When `false`, the appraisal still runs unchanged, but no goal-aware
+  fields are injected and no goal lines render (the block is byte-for-byte
+  identical to a no-goals run); a non-failure `skipped:drive_disabled` telemetry
+  row is recorded. It never gates the whole hook.
+- **`drive_domains`** (list of strings, default `[]` = unrestricted) — the domain
+  WHITELIST. When NON-empty, the drive surfaces ONLY goals whose `domain` is in
+  the list; goals with an unlisted domain (or no domain) are suppressed from the
+  goal-aware fields. The empty default imposes NO restriction, so default
+  behaviour is unchanged. A malformed value (non-list, junk members) coerces to
+  the surviving clean strings without error.
+- **`drive_energy_budget`** (int, default `3`, floor `0`) — the per-turn
+  energy/attention budget: the maximum number of NON-flagged drive lines
+  (`- drive want:` / `- drive note:`) that surface per turn. A flagged-priority
+  want is EXEMPT — it is never dropped to satisfy the budget (never-omit beats
+  the budget; DRIVE-05 takes precedence over DRIVE-06). A non-int value falls
+  back to the default.
+
+`drive_pressure` (`quiet|standard|firm`, default `standard`) tunes how firm the
+drive may become; code-red is excluded from this phase. Out-of-vocabulary values
+coerce to `standard`.
 - The `llm.model` override only *requests* a model; the host trust gate
   (`allow_model_override` / `allowed_models`) decides. If the gate denies the request,
   the plugin retries once with the host's active model (outcome `trust_fallback`) —

@@ -40,6 +40,14 @@ written pre-call by design; see reflection.py's module docstring).
 | on_session_end: no DB + no ctx            | ::test_on_session_end_no_db_no_ctx_returns_none                                                              | implemented   |
 | on_session_end: exploding reflection LLM  | ::test_on_session_end_exploding_llm_fails_open                                                               | implemented   |
 | post_llm_call: locked DB                  | ::test_post_llm_call_locked_db_returns_none                                                                  | implemented   |
+| velocity: absent .git (DRIVE-02)          | ::test_velocity_absent_git_block_still_renders                                                               | implemented   |
+| velocity: unparseable reflog (DRIVE-02)   | ::test_velocity_unparseable_reflog_fails_open                                                                | implemented   |
+| velocity: bad timestamp (DRIVE-02)        | ::test_velocity_bad_timestamp_fails_open                                                                     | implemented   |
+| drive kill switch off (DRIVE-06)          | ::test_drive_disabled_appraisal_unchanged, ::test_drive_disabled_is_non_failure                             | implemented   |
+| locked-DB goal write (DRIVE-01)           | test_drive_store.py::test_locked_db_goal_write_returns_false                                                 | referenced    |
+| malformed drive config coerced (DRIVE-06) | ::test_missing_config_malformed_drive_values_coerced                                                         | implemented   |
+| domain whitelist suppression (DRIVE-06)   | ::test_drive_whitelist_suppression_full_hook                                                                 | implemented   |
+| energy budget cap (DRIVE-06)              | ::test_drive_budget_cap_full_hook (flagged exempt — DRIVE-05 > DRIVE-06)                                     | implemented   |
 
 Lock-semantics note (verified 2026-06-10 against sqlite3 under the hermes
 venv): in WAL mode — the production arrangement, set at DB creation — a held
@@ -129,6 +137,10 @@ def _cfg(**overrides):
         "history_chars": 4000,
         "model": None,
         "max_tokens": 700,
+        "drive_enabled": True,
+        "drive_domains": [],
+        "drive_energy_budget": 3,
+        "drive_pressure": "standard",
     }
     cfg.update(overrides)
     return cfg
@@ -250,6 +262,10 @@ _DEFAULTS = {
     "reflect_every_n_turns": 5,
     "reflect_max_tokens": 700,
     "reflect_deadline_seconds": 8.0,
+    "drive_enabled": True,
+    "drive_domains": [],
+    "drive_energy_budget": 3,
+    "drive_pressure": "standard",
 }
 
 
@@ -300,6 +316,29 @@ def test_missing_config_malformed_values_coerced(matrix_env, monkeypatch):
     assert _telemetry_rows(matrix_env.db_path) == [("ok",)]
 
 
+def test_missing_config_malformed_drive_values_coerced(matrix_env, monkeypatch):
+    """DRIVE-06 containment values are coerced defensively: a non-list
+    drive_domains, a non-int drive_energy_budget, and an invalid drive_pressure
+    all fall back to documented defaults — get_cfg never raises — and a
+    subsequent full hook still injects normally."""
+    monkeypatch.setattr(
+        config,
+        "_load_host_entry",
+        lambda: {
+            "drive_domains": "proj-a",        # non-list -> []
+            "drive_energy_budget": "lots",    # non-int -> default 3
+            "drive_pressure": "code-red",     # excluded from Phase 7 -> standard
+        },
+    )
+    assert config.get_cfg(force_reload=True) == _DEFAULTS  # coerced, no raise
+
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is the migration going?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    assert _telemetry_rows(matrix_env.db_path) == [("ok",)]
+
+
 # ---------------------------------------------------------------------------
 # gateway session-rollover state reuse (long-lived process, no
 # on_session_start between sessions — the gateway-lane shape)
@@ -329,6 +368,234 @@ def test_gateway_rollover_reuses_module_state(pinned_env):
     assert third is None
     assert _telemetry_rows(pinned_env.db_path)[-1] == ("skipped:duplicate",)
     assert pinned_env.state["caller"].calls == 2
+
+
+# ---------------------------------------------------------------------------
+# DRIVE-06: the SEPARATE drive kill switch (success criterion 4) — drive off
+# ⇒ zero goal-aware fields, appraisal block byte-for-byte unchanged, and a
+# non-failure skipped:drive_disabled telemetry row.
+# ---------------------------------------------------------------------------
+
+
+def _seed_goals(db_path):
+    """Persist a flagged active goal + an INERT candidate into the tmp DB."""
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {"text": "ship the drive layer", "status": "active",
+                 "success_criteria": "phase 7 complete", "flagged_priority": 1},
+                {"text": "maybe a dashboard", "status": "candidate"},
+            ]
+        },
+        db_path,
+    ) is True
+
+
+def test_drive_disabled_appraisal_unchanged(pinned_env):
+    """Drive off + a goals-bearing snapshot: the hook still returns a normal
+    block; that block is byte-for-byte identical to the SAME inputs run with
+    NO goals present (the appraisal-unchanged invariant). A non-failure
+    skipped:drive_disabled telemetry row is recorded."""
+    message = "how is the migration going?"
+
+    # Run 1: drive OFF, goals present in the DB.
+    pinned_env.state["cfg"] = _cfg(drive_enabled=False)
+    _seed_goals(pinned_env.db_path)
+    pinned_env.state["caller"] = _CountingCaller(RICH_PAYLOAD)
+    out_off = anansi.pre_llm_call(session_id="s1", user_message=message)
+    assert isinstance(out_off, dict) and set(out_off) == {"context"}
+    assert out_off["context"].startswith("[anansi appraisal]")
+    # The non-failure skipped row rode along this eligible turn.
+    assert ("skipped:drive_disabled",) in _telemetry_rows(pinned_env.db_path)
+
+    # Run 2: drive ON but NO goals in a fresh DB — the reference block.
+    fresh_db = pinned_env.db_path.parent / "ref.db"
+    assert store.ensure_db(fresh_db) is True
+    real_get = store.get_db_path
+    try:
+        store.get_db_path = lambda: fresh_db
+        pinned_env.state["cfg"] = _cfg(drive_enabled=True)
+        anansi._session_state.update({"session_id": None, "last_msg_norm": None})
+        pinned_env.state["caller"] = _CountingCaller(RICH_PAYLOAD)
+        out_ref = anansi.pre_llm_call(session_id="s2", user_message=message)
+    finally:
+        store.get_db_path = real_get
+    assert isinstance(out_ref, dict) and set(out_ref) == {"context"}
+
+    # Byte-for-byte equal: drive-off-with-goals == drive-on-with-no-goals.
+    assert out_off["context"] == out_ref["context"]
+
+
+def test_drive_disabled_is_non_failure(pinned_env):
+    """skipped:drive_disabled rides the skipped:* exclusion prefix: it does
+    NOT count toward telemetry_summary.failure_count."""
+    pinned_env.state["cfg"] = _cfg(drive_enabled=False)
+    pinned_env.state["caller"] = _CountingCaller(RICH_PAYLOAD)
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is the migration going?"
+    )
+    assert isinstance(out, dict)
+    rows = _telemetry_rows(pinned_env.db_path)
+    assert ("skipped:drive_disabled",) in rows
+    assert ("ok",) in rows  # appraisal still ran
+
+    summary = store.telemetry_summary(pinned_env.db_path)
+    assert summary is not None
+    assert summary["failure_count"] == 0  # drive-disabled is a non-failure
+    assert summary["by_outcome"].get("skipped:drive_disabled") == 1
+
+
+# ---------------------------------------------------------------------------
+# DRIVE-02: read-time velocity fail-open rows (07-02). Absent/corrupt .git,
+# an unparseable reflog, and a bad timestamp ALL degrade to 'unknown'
+# momentum — the hook still returns its normal block (or suppresses), never
+# raises, telemetry stays sane.
+# ---------------------------------------------------------------------------
+
+
+def test_velocity_absent_git_block_still_renders(pinned_env, monkeypatch):
+    """Drive on, goals-bearing DB, repo-root resolves to a dir with NO .git
+    ⇒ momentum 'unknown'; the hook still returns a normal block, never
+    raises, and records a single ok row."""
+    _seed_goals(pinned_env.db_path)
+    pinned_env.state["cfg"] = _cfg(drive_enabled=True)
+    pinned_env.state["caller"] = _CountingCaller(RICH_PAYLOAD)
+    # A repo root with no .git -> _last_commit_epoch returns None -> unknown.
+    monkeypatch.setattr(store, "_repo_root", lambda start=None: None)
+
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is the drive layer going?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
+
+
+def test_velocity_unparseable_reflog_fails_open(pinned_env, monkeypatch):
+    """The reflog parse raising/garbage ⇒ momentum 'unknown'; the hook still
+    returns normally, no raise."""
+    _seed_goals(pinned_env.db_path)
+    pinned_env.state["cfg"] = _cfg(drive_enabled=True)
+    pinned_env.state["caller"] = _CountingCaller(RICH_PAYLOAD)
+
+    def _boom(repo_root):
+        raise RuntimeError("garbage reflog")
+
+    monkeypatch.setattr(store, "_last_commit_epoch", _boom)
+
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is the drive layer going?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
+
+
+def test_velocity_bad_timestamp_fails_open(pinned_env, monkeypatch):
+    """A goal whose momentum computation hits a bad timestamp degrades to the
+    benign default; the hook is unaffected."""
+    _seed_goals(pinned_env.db_path)
+    pinned_env.state["cfg"] = _cfg(drive_enabled=True)
+    pinned_env.state["caller"] = _CountingCaller(RICH_PAYLOAD)
+
+    def _bad(goal, repo_root=None, now=None):
+        # Simulate a velocity path that hits an unparseable timestamp and
+        # returns the benign default rather than raising.
+        return store._momentum_default()
+
+    monkeypatch.setattr(store, "goal_momentum", _bad)
+
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is the drive layer going?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
+
+
+# ---------------------------------------------------------------------------
+# DRIVE-06 containment: the domain whitelist + the per-turn energy budget, both
+# through the FULL registered pre_llm_call hook. A whitelist drops off-domain
+# goals from the surfaced block; the budget caps NON-flagged drive lines while a
+# flagged-priority want stays (never-omit beats the budget). Both fail open: the
+# hook always returns a normal block and records a single ok row.
+# ---------------------------------------------------------------------------
+
+
+def _seed_domain_goals(db_path):
+    """A proj-a goal and a proj-b goal (both active, both with momentum
+    available at read time)."""
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {"text": "ship proj-a feature", "status": "active",
+                 "success_criteria": "done", "domain": "proj-a"},
+                {"text": "ship proj-b feature", "status": "active",
+                 "success_criteria": "done", "domain": "proj-b"},
+            ]
+        },
+        db_path,
+    ) is True
+
+
+def test_drive_whitelist_suppression_full_hook(pinned_env):
+    """Whitelist set to ['proj-a'] with an off-domain proj-b goal in the tmp DB:
+    the hook returns a normal block; the off-domain goal never reaches the model
+    context, and the hook never raises (single ok row). A faithful model only
+    sees whitelisted goals, so no proj-b drive line can surface."""
+    _seed_domain_goals(pinned_env.db_path)
+    # The fake model echoes a goal_signal for proj-b — but proj-b was filtered
+    # out before appraisal, so enrich finds no match and the block stays normal.
+    payload = dict(RICH_PAYLOAD)
+    payload["goal_signals"] = [
+        {"relates_to_goal": "ship proj-b feature", "confidence": 0.9}
+    ]
+    pinned_env.state["cfg"] = _cfg(drive_enabled=True, drive_domains=["proj-a"])
+    pinned_env.state["caller"] = _CountingCaller(payload)
+
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is proj-a going?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    # proj-b was suppressed before the model ever saw it; never raises.
+    assert "ship proj-b feature" not in out["context"]
+    assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
+
+
+def test_drive_budget_cap_full_hook(pinned_env):
+    """drive_energy_budget=1 with multiple non-flagged goal_signals: at most one
+    `- drive note:` line surfaces in the returned block; a flagged goal (seeded
+    in the DB) still appears as a `- drive want:` line — never-omit beats the
+    budget (DRIVE-05 > DRIVE-06). The hook never raises (single ok row)."""
+    # One flagged goal + the budget=1 cap applied to the model's non-flagged
+    # goal_signals.
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {"text": "land the launch", "status": "active",
+                 "success_criteria": "shipped", "flagged_priority": 1,
+                 "domain": "launch"},
+            ]
+        },
+        pinned_env.db_path,
+    ) is True
+    payload = dict(RICH_PAYLOAD)
+    payload["goal_signals"] = [
+        {"relates_to_goal": "side quest one", "confidence": 0.8},
+        {"relates_to_goal": "side quest two", "confidence": 0.8},
+        {"relates_to_goal": "side quest three", "confidence": 0.8},
+    ]
+    pinned_env.state["cfg"] = _cfg(drive_enabled=True, drive_energy_budget=1)
+    pinned_env.state["caller"] = _CountingCaller(payload)
+
+    out = anansi.pre_llm_call(
+        session_id="s1", user_message="how is the launch going?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    block = out["context"]
+    note_lines = [ln for ln in block.split("\n") if ln.startswith("- drive note:")]
+    want_lines = [ln for ln in block.split("\n") if ln.startswith("- drive want:")]
+    assert len(note_lines) <= 1  # budget capped the non-flagged notes
+    assert len(want_lines) == 1  # the flagged priority survived the budget
+    assert "land the launch" in want_lines[0]
+    assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
 
 
 # ---------------------------------------------------------------------------

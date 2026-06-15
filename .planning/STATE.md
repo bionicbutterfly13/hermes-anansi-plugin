@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-06-10)
 
 **Core value:** Every Hermes turn gets a grounded metacognitive appraisal injected before response generation; after PR #43906 was withdrawn, the plugin is proprietary and v1 remains the foundation.
-**Current focus:** Phase 6 design complete; Phase 7 (Drive / Accountability) added — next is plan-phase 7
+**Current focus:** Phase 7 (Drive / Accountability) COMPLETE — all 4 plans executed on branch phase-7-drive-accountability; next is verify-work / review / ship for Phase 7
 
 ## Current Position
 
-Phase: 7 of 7 (Drive / Accountability — first proprietary implementation increment)
-Plan: not yet planned — run `plan-phase 7`
-Status: Phase 6 design COMPLETE (06-CONTEXT). Phase 7 added via add-phase to home the Drive/accountability BUILD (Phase 6 was design-only, 0 requirement IDs). Phase 7 = user-minted goals + progress velocity + in-turn goal-aware appraisal + never-omit invariant; drive state extends the anansi SQLite store (DRIVE-01..06). Next workflow: `plan-phase 7`.
-Last activity: 2026-06-14 — Added Phase 7 (Drive / Accountability); next workflow is `plan-phase 7`.
+Phase: 7 of 7 (Drive / Accountability — first proprietary implementation increment) — COMPLETE
+Plan: 07-04 COMPLETE (2/2 tasks, full suite green at 165 passed). Phase 7 done (4/4 plans). Next: verify-work / review / ship Phase 7.
+Status: All four Phase 7 plans executed on branch phase-7-drive-accountability. DRIVE-01 (goal tables, schema v4, single sqlite surface), DRIVE-06 partial (drive kill switch + byte-for-byte invariant + non-failure telemetry), DRIVE-03 partial (goal_signals + `- drive note:` line) landed in 07-01. DRIVE-02 (07-02): stdlib-only `goal_momentum` helper derives per-goal momentum from GROUND TRUTH at appraisal-READ time; `stalled_days` threads through the `- drive note:` render line; stalled goals render FIRST; fail-open everywhere. DRIVE-04 (07-03): NEW first-person `- drive want:` line ("I want X moving (stalled N days)") as a LABEL allowance ONLY — `_SECOND_PERSON_DIRECTIVE_RE` + `conftest.DIRECTIVE_PATTERNS` UNCHANGED; existing SAFE-03/04 negative controls preserved + a symmetric drive-specific control added (first-person passes; second-person quoted or rejected). DRIVE-05 (07-03 — the never-omit red line): a `flagged_priority>0` goal is EXEMPT from BOTH the `[:3]` slice AND the token-cap line-drop — flagged wants render FIRST into a PROTECTED prefix, the cap loop stops at `max(protected_count, 2)`, and the guarantee reads PERSISTED goals (not model output) so a flagged goal surfaces even when the model omits it; proven under adversarial crowding + full-hook integration. Anti-complacency: a stalled `push_when_stalled`/`support_style='firm'` goal renders a VISIBLE `[under-support: ...]` clause separate from the neutral stalled read (Pitfall #9). DRIVE-06 remainder (07-04): the two remaining containment controls — a domain WHITELIST (`drive_domains`, default [] = unrestricted) suppresses off-domain goals from BOTH the persisted-goal slice AND echoed `goal_signals`, and a per-turn ENERGY BUDGET (`drive_energy_budget`, default 3, floor 0) caps NON-flagged drive lines while a flagged want is EXEMPT (never-omit beats the budget; DRIVE-05 > DRIVE-06). `drive_pressure` (quiet|standard|firm, code-red excluded) is coerced/documented config. All coerce defensively (`_coerce_str_list`/`_coerce_choice`) and get_cfg never raises; consolidated fail-open matrix gains a documented row per new drive path; README documents all three containment controls + a Drive subsection. Next workflow: `verify-work` / `/review` / `/ship` for Phase 7.
+Last activity: 2026-06-14 — Executed plan 07-04 (DRIVE-06 remainder: domain whitelist + energy budget containment + consolidated fail-open matrix + README); 2 atomic commits; SUMMARY written; suite 151 → 165 passed. Phase 7 complete.
 
-Progress: [██████████] 100% v1; Phase 6 design captured; Phase 7 added — ready to plan the drive increment
+Progress: [██████████] 100% v1; Phase 6 design captured; Phase 7 COMPLETE (4/4 plans) — drive layer contained + adjustable, never-omit guaranteed
 
 ## Performance Metrics
 
@@ -60,6 +60,20 @@ Progress: [██████████] 100% v1; Phase 6 design captured; Pha
 | Phase 6 first increment = Drive/accountability; drive state extends anansi SQLite store (store.py) | 6 | discuss-phase 6 / 06-CONTEXT; single sqlite surface preserved |
 | Never-omit invariant: agent guesses never outrank stated priorities; never silently drop a flagged item | 6 | Core drive red line; silent omission = betrayal (Dr. Mani top anti-value) |
 | Drive surfacing in-turn only (no proactive push); heartbeat + code-red interruption deferred | 6 | Extends one-turn-lag idiom; fail-open preserved; code-red needs user-defined triggers only |
+| Drive pressure adjustable + inspectable | 6 | Drive may adjust salience/urgency/persistence only; neutral read vs drive effect must stay visible |
+| Anti-complacency is part of drive safety | 6 | User-authorized push zones prevent stalled high-priority goals from being quietly downranked; under-support must be surfaced |
+| Goal state lives in store.py schema v4 (`goals` table); agent-nominated goals default to INERT `status='candidate'`, never surfaced as active until a goals_status promotion | 7 | DRIVE-01 (07-01); goal provenance — agent nominates, user mints; single sqlite surface preserved |
+| Drive kill switch (`drive_enabled`) is SEPARATE from appraisal `enabled`; gated AFTER the appraisal check, no early-return; drive-off block is byte-for-byte identical to a no-goals run; `skipped:drive_disabled` is a non-failure | 7 | DRIVE-06 partial (07-01); success criterion 4 — drive-off suppression proven via byte-for-byte test + telemetry exclusion-list |
+| Drive-off suppression is belt-and-suspenders: build_context omits the goals slice AND __init__ strips goal_signals before render | 7 | 07-01 — byte-for-byte invariant holds regardless of (fake/adversarial) model output, not just a faithful model |
+| Per-goal momentum derived at READ time in store.read_snapshot (git reflog committer epoch + os.stat mtimes via stdlib read-mode open() only — NO subprocess/git lib), NOT behind debounced reflection | 7 | DRIVE-02 (07-02); a goal that stalled this turn reads stalled this turn (Pitfall #3); anti-creep forbidden-substring scan bricks on subprocess/os.system even in comments |
+| "Stalled louder" = SALIENCE/ORDERING (stalled goals render first), never imperative loudness; neutral momentum (stalled_days) and drive-caused pressure effect (`[push zone]` clause) render SEPARATELY and stay inspectable | 7 | DRIVE-02 (07-02); SAFE-04 + reactance — loudness-via-imperative is forbidden; Pitfall #9 inspectability red line |
+| `enrich_goal_signals` grounds each parsed goal_signal in the matching persisted goal's read-time momentum + pressure metadata; goal `domain` doubles as the per-goal mtime hint (repo-containment guarded) | 7 | DRIVE-02 (07-02); stalled signal anchored to ground truth even when the model omits stalled_days; no schema bump |
+| First-person `- drive want:` voice is a LABEL allowance only (added to `conftest.ALLOWED_LABEL_PREFIXES`); `_SECOND_PERSON_DIRECTIVE_RE` + `conftest.DIRECTIVE_PATTERNS` stay UNCHANGED — second-person directives still quoted/neutralized; negative controls preserved + a symmetric drive control added | 7 | DRIVE-04 (07-03); SAFE-04 carve-out is first-person only; a checker that cannot fail proves nothing |
+| Never-omit: a `flagged_priority>0` goal renders FIRST into a PROTECTED prefix, exempt from the `[:3]` slice AND the token-cap pop (`floor=max(protected_count,2)`); never-omit BEATS the soft ~500-token cap; the guarantee reads PERSISTED goals, not model output, so a flagged goal surfaces even when the model omits it | 7 | DRIVE-05 (07-03); the drive red line — silent omission = betrayal; proven under adversarial crowding + full-hook with a model payload that omits the goal |
+| Anti-complacency: a stalled goal with `push_when_stalled`/`support_style='firm'` renders a VISIBLE `[under-support: ...]` clause SEPARATE from the neutral `stalled N days` read; APPR-05 precedence intact (empty signals ⇒ None even with a flagged goal) | 7 | DRIVE-05 (07-03); Pitfall #9 inspectability — drive effect never blended into the neutral read; a flagged goal rides a block, never forces one |
+| Domain whitelist (`drive_domains`, default [] = unrestricted) suppresses off-domain goals from BOTH the persisted-goal slice AND the model's echoed `goal_signals` (`_filter_signals_by_goals`), so an off-domain goal cannot leak back through the model echo; empty whitelist = no-op (07-01..03 unchanged); fail-open returns the unfiltered set | 7 | DRIVE-06 (07-04); filtering only the persisted goals left an echoed off-domain `goal_signal` able to surface as a `- drive note:` — the signal-level filter closes that leak |
+| Energy budget (`drive_energy_budget`, default 3, floor 0) caps NON-flagged drive notes at `min(3, budget)` INSIDE render_block (after the protected flagged prefix); a flagged `- drive want:` is structurally EXEMPT — never-omit (DRIVE-05) beats the budget (DRIVE-06) by construction; malformed budget ⇒ standing top-3 (fail-open) | 7 | DRIVE-06 (07-04); the cap trims `non_flagged_signals` only, never the protected prefix |
+| `drive_pressure` (quiet\|standard\|firm; code-red EXCLUDED from Phase 7) is coerced/documented config with no behavioural branch yet — the adjustability surface a later heartbeat/panel increment tunes; coercion (`_coerce_choice`) never raises | 7 | DRIVE-06 (07-04); containment surface complete without over-building the firmness behaviour now |
 
 ## Blockers / Concerns
 
@@ -76,5 +90,5 @@ Progress: [██████████] 100% v1; Phase 6 design captured; Pha
 
 ## Session Continuity
 
-Last session: 2026-06-14 (discuss-phase 6 → add-phase 7)
-Stopped at: Phase 7 added; next: `plan-phase 7`.
+Last session: 2026-06-14 (executed Phase 7 plan 07-04 on branch phase-7-drive-accountability)
+Stopped at: 07-04 complete (2 atomic commits, suite green 165 passed, SUMMARY written) — Phase 7 COMPLETE (4/4 plans); next: verify-work / review / ship Phase 7.
