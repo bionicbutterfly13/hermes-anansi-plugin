@@ -135,6 +135,21 @@ def on_session_start(session_id="", platform="", **kwargs):
     if not store.ensure_db():
         logger.debug("anansi state store unavailable — continuing without state")
 
+    # G7 (audit #5): make a degraded config legible. Reload config now (the
+    # cache was just reset) and emit ONE telemetry row per value that was coerced
+    # away from what the user wrote — secret-safe (shape only, never the rejected
+    # value), once per session. Fail-open: never raises, never blocks the turn.
+    try:
+        cfg = config.get_cfg(force_reload=True)
+        for key, shape in config.get_degradations():
+            store.record_telemetry(
+                "config_degraded",
+                error="%s: rejected %s, applied %r" % (key, shape, cfg.get(key)),
+                session_id=session_id,
+            )
+    except Exception:
+        logger.debug("anansi config-degradation telemetry skipped", exc_info=True)
+
     llm = getattr(_ctx, "llm", None) if _ctx is not None else None
     reflection.maybe_reflect(llm=llm, session_id=session_id)
     return None
@@ -251,9 +266,18 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
     # render_block, after the protected flagged prefix is assembled, so a
     # flagged want is never dropped to satisfy the budget. None ⇒ no cap.
     energy_budget = cfg.get("drive_energy_budget") if drive_on else None
+    # G3: the global drive_pressure level modulates drive-note verbosity ONLY
+    # (quiet<standard<firm). Only when drive is on — drive-off keeps goals=None
+    # and thus no drive notes, so the byte-for-byte drive-off block is unchanged.
+    pressure = cfg.get("drive_pressure") if drive_on else None
+    # G4: bound the number of flagged `- drive want:` lines. The top-priority
+    # wants always render (never-omit); the tail is withheld VISIBLY. Only when
+    # drive is on — drive-off keeps goals=None and thus no wants at all.
+    flagged_want_cap = cfg.get("drive_flagged_want_cap") if drive_on else None
     block = render.render_block(
         result.signals, snapshot=snapshot, goals=goals,
-        energy_budget=energy_budget,
+        energy_budget=energy_budget, pressure=pressure,
+        flagged_want_cap=flagged_want_cap,
     )
     if block is None:  # empty-signal suppression (APPR-05)
         return None

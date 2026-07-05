@@ -148,7 +148,71 @@ def test_multiple_flagged_goals_all_survive_slice():
     block = render.render_block(signals, goals=flagged)
     assert block is not None
     wants = [l for l in block.split("\n") if l.startswith("- drive want:")]
-    assert len(wants) == 4  # NOT sliced to 3
+    assert len(wants) == 4  # NOT sliced to 3 (no cap passed -> unbounded)
+    assert_no_directive_language(block)
+
+
+# ---------------------------------------------------------------------------
+# G4: flagged wants are BOUNDED, but the top priorities always render and the
+# withholding is VISIBLE (never silent)
+# ---------------------------------------------------------------------------
+
+
+def _flagged_goal_pri(text, pri):
+    return {"text": text, "status": "active", "flagged_priority": pri}
+
+
+def test_flagged_want_cap_keeps_top_priority_and_marks_withheld():
+    """More flagged goals than the cap: the HIGHEST-priority wants render, the
+    least-critical tail is withheld, and the withholding is VISIBLE (a marker
+    line) — never a silent drop (never-omit preserved)."""
+    signals = _rich_signals(n_goal_signals=0)
+    goals = [
+        _flagged_goal_pri("top priority alpha", 9),
+        _flagged_goal_pri("second priority beta", 7),
+        _flagged_goal_pri("lesser priority gamma", 3),
+        _flagged_goal_pri("lesser priority delta", 2),
+        _flagged_goal_pri("lesser priority epsilon", 1),
+    ]
+    block = render.render_block(signals, goals=goals, flagged_want_cap=2)
+    assert block is not None
+    wants = [l for l in block.split("\n") if l.startswith("- drive want:")]
+    assert len(wants) == 3  # 2 real wants + 1 withheld marker
+    assert any("top priority alpha" in w for w in wants)  # highest survives
+    assert any("second priority beta" in w for w in wants)  # 2nd survives
+    assert any("3 flagged priorities withheld" in w for w in wants)  # visible
+    # the least-critical wants were withheld, not silently rendered
+    assert "lesser priority epsilon" not in block
+    assert "lesser priority gamma" not in block
+    assert_no_directive_language(block)
+
+
+def test_flagged_want_cap_floor_keeps_single_top():
+    """cap=1 (the floor) still surfaces the single top-priority want plus the
+    marker — never-omit's hard minimum survives the tightest cap."""
+    signals = _rich_signals(n_goal_signals=0)
+    goals = [
+        _flagged_goal_pri("keep me highest", 5),
+        _flagged_goal_pri("drop me lower", 1),
+    ]
+    block = render.render_block(signals, goals=goals, flagged_want_cap=1)
+    wants = [l for l in block.split("\n") if l.startswith("- drive want:")]
+    assert len(wants) == 2  # 1 want + marker
+    assert any("keep me highest" in w for w in wants)
+    assert any("1 flagged priorities withheld" in w for w in wants)
+    assert "drop me lower" not in block
+    assert_no_directive_language(block)
+
+
+def test_flagged_want_cap_none_is_unbounded():
+    """cap=None (the library default / drive-off path) renders ALL flagged
+    wants with no marker — historical behaviour is unchanged."""
+    signals = _rich_signals(n_goal_signals=0)
+    goals = [_flagged_goal_pri("goal number %d" % i, i + 1) for i in range(6)]
+    block = render.render_block(signals, goals=goals, flagged_want_cap=None)
+    wants = [l for l in block.split("\n") if l.startswith("- drive want:")]
+    assert len(wants) == 6
+    assert not any("withheld" in w for w in wants)
     assert_no_directive_language(block)
 
 

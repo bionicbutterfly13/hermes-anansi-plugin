@@ -141,6 +141,7 @@ def _cfg(**overrides):
         "drive_domains": [],
         "drive_energy_budget": 3,
         "drive_pressure": "standard",
+        "drive_flagged_want_cap": 5,
     }
     cfg.update(overrides)
     return cfg
@@ -270,6 +271,7 @@ _DEFAULTS = {
     "drive_domains": [],
     "drive_energy_budget": 3,
     "drive_pressure": "standard",
+    "drive_flagged_want_cap": 5,
 }
 
 

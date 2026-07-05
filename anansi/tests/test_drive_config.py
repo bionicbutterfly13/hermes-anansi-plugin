@@ -14,6 +14,8 @@ build_context / render_block directly or a tmp DB — the real $HERMES_HOME is
 never touched.
 """
 
+from conftest import assert_no_directive_language
+
 from anansi import appraisal, config, render, store
 
 
@@ -229,3 +231,125 @@ def test_budget_malformed_falls_back_to_top3():
     assert block is not None
     note_lines = [ln for ln in block.split("\n") if ln.startswith("- drive note:")]
     assert len(note_lines) == 3
+
+
+# ---------------------------------------------------------------------------
+# G3: global drive_pressure modulates drive-note VERBOSITY (quiet<standard<firm)
+# ---------------------------------------------------------------------------
+
+
+def _note_count(block):
+    return len([ln for ln in block.split("\n") if ln.startswith("- drive note:")])
+
+
+def test_pressure_levels_are_distinguishable():
+    """On IDENTICAL state (5 non-flagged goal notes, no energy cap), each
+    drive_pressure level renders a distinguishable number of drive notes:
+    quiet<standard<firm (SC-003)."""
+    sig = _signals_with_n_goal_notes(5)
+    quiet = render.render_block(sig, energy_budget=None, pressure="quiet")
+    standard = render.render_block(sig, energy_budget=None, pressure="standard")
+    firm = render.render_block(sig, energy_budget=None, pressure="firm")
+    assert _note_count(quiet) == 1
+    assert _note_count(standard) == 3
+    assert _note_count(firm) == 5
+    # strictly increasing + all three blocks differ
+    assert quiet != standard != firm and quiet != firm
+    for block in (quiet, standard, firm):
+        assert_no_directive_language(block)
+
+
+def test_pressure_standard_is_byte_identical_to_default():
+    """pressure='standard' (and an unknown pressure) reproduces the pre-G3
+    default render byte-for-byte — standard behaviour is unchanged."""
+    sig = _signals_with_n_goal_notes(5)
+    default = render.render_block(sig, energy_budget=None)  # no pressure arg
+    assert render.render_block(sig, energy_budget=None, pressure="standard") == default
+    assert render.render_block(sig, energy_budget=None, pressure="StAnDaRd ") == default
+    # malformed / unknown pressure falls back to standard, never raises
+    assert render.render_block(sig, energy_budget=None, pressure="nonsense") == default
+    assert render.render_block(sig, energy_budget=None, pressure=42) == default
+    assert render.render_block(sig, energy_budget=None, pressure=None) == default
+
+
+def test_energy_budget_still_caps_pressure():
+    """The energy budget is a HARD cap that clamps the pressure ceiling: firm
+    (base 5) with budget=2 surfaces 2 notes (min(5, 2)); flagged wants remain
+    exempt elsewhere."""
+    sig = _signals_with_n_goal_notes(5)
+    firm_capped = render.render_block(sig, energy_budget=2, pressure="firm")
+    assert _note_count(firm_capped) == 2
+    quiet_under_budget = render.render_block(sig, energy_budget=3, pressure="quiet")
+    assert _note_count(quiet_under_budget) == 1  # quiet ceiling (1) < budget (3)
+
+
+# ---------------------------------------------------------------------------
+# G7: config-degradation detection (audit #5) — legible + secret-safe
+# ---------------------------------------------------------------------------
+
+
+def test_config_degradations_flags_rejected_and_clamped(monkeypatch):
+    """Values the user provided but that were coerced away (rejected or clamped)
+    are reported by get_degradations() as (key, secret-safe shape)."""
+    monkeypatch.setattr(
+        config,
+        "_load_host_entry",
+        lambda: {
+            "drive_pressure": "code-red",   # rejected choice -> standard
+            "drive_energy_budget": "lots",  # unparseable int -> default
+            "drive_domains": "proj-a",      # non-list -> []
+            "confidence_threshold": 5.0,    # clamped 5.0 -> 1.0
+        },
+    )
+    config.get_cfg(force_reload=True)
+    degraded = dict(config.get_degradations())
+    assert set(degraded) == {
+        "drive_pressure",
+        "drive_energy_budget",
+        "drive_domains",
+        "confidence_threshold",
+    }
+    # shape only, never the literal value
+    assert degraded["drive_pressure"] == "<str len=8>"  # 'code-red'
+    assert degraded["drive_domains"] == "<str len=6>"  # 'proj-a'
+    assert "code-red" not in " ".join(degraded.values())
+
+
+def test_config_degradation_never_leaks_a_secret(monkeypatch):
+    """A mistyped credential in a config field is NEVER quoted — only its length
+    shape is recorded (secret-safety)."""
+    secret = "sk-supersecret-DEADBEEF-42"
+    monkeypatch.setattr(
+        config, "_load_host_entry", lambda: {"drive_energy_budget": secret}
+    )
+    config.get_cfg(force_reload=True)
+    degraded = dict(config.get_degradations())
+    assert "drive_energy_budget" in degraded
+    assert secret not in degraded["drive_energy_budget"]
+    assert degraded["drive_energy_budget"] == "<str len=%d>" % len(secret)
+
+
+def test_valid_config_has_no_degradations(monkeypatch):
+    """Valid AND legitimately-normalized values (case, whitespace, string ints)
+    produce ZERO degradations — no false positives."""
+    monkeypatch.setattr(
+        config,
+        "_load_host_entry",
+        lambda: {
+            "drive_pressure": "FIRM",       # normalized, not degraded
+            "drive_energy_budget": 2,
+            "drive_domains": ["proj-a"],
+            "confidence_threshold": 0.7,
+            "history_chars": "4000",        # string int -> same value
+        },
+    )
+    config.get_cfg(force_reload=True)
+    assert config.get_degradations() == []
+
+
+def test_get_degradations_never_raises_and_defaults_empty(monkeypatch):
+    """No host entry -> valid defaults -> no degradations; get_degradations is
+    always a list."""
+    monkeypatch.setattr(config, "_load_host_entry", lambda: None)
+    config.get_cfg(force_reload=True)
+    assert config.get_degradations() == []
