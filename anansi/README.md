@@ -110,7 +110,8 @@ plugins:
       drive_enabled: true            # SEPARATE drive kill switch — false stops goal-aware fields; appraisal unchanged
       drive_domains: []              # domain WHITELIST; non-empty ⇒ only goals in these domains surface; [] = unrestricted
       drive_energy_budget: 3         # int, floor 0 — max NON-flagged drive lines/turn; flagged wants are exempt
-      drive_pressure: standard       # quiet|standard|firm — how firm the drive may become (code-red excluded)
+      drive_pressure: standard       # quiet|standard|firm — drive-note verbosity ceiling (code-red excluded)
+      drive_flagged_want_cap: 5      # int, floor 1 — max flagged `- drive want:` lines; overflow shown as a withheld marker
       llm:
         model: claude-haiku-4-5      # optional model override; default: none (host's active model)
 ```
@@ -143,9 +144,19 @@ config keys, all under `plugins.entries.anansi`, all fail-open to safe defaults:
   the budget; DRIVE-05 takes precedence over DRIVE-06). A non-int value falls
   back to the default.
 
-`drive_pressure` (`quiet|standard|firm`, default `standard`) tunes how firm the
-drive may become; code-red is excluded from this phase. Out-of-vocabulary values
-coerce to `standard`.
+- **`drive_flagged_want_cap`** (int, default `5`, floor `1`) — bounds how many
+  flagged `- drive want:` lines render per turn. The highest-priority wants
+  (by `flagged_priority`) ALWAYS render — never-omit is preserved — and any
+  overflow is surfaced VISIBLY as a `- drive want: [N flagged priorities
+  withheld]` marker, never a silent drop. A value below `1` clamps to `1` so the
+  single top priority always survives.
+
+`drive_pressure` (`quiet|standard|firm`, default `standard`) tunes the drive-note
+verbosity ceiling: `quiet` surfaces fewer non-flagged `- drive note:` lines,
+`firm` more, and `standard` keeps the historical ceiling (output is byte-identical
+at `standard`). It changes salience/ordering/verbosity ONLY — never the wording,
+never imperative loudness — and the energy budget still caps further. Code-red is
+excluded from this phase; out-of-vocabulary values coerce to `standard`.
 - The `llm.model` override only *requests* a model; the host trust gate
   (`allow_model_override` / `allowed_models`) decides. If the gate denies the request,
   the plugin retries once with the host's active model (outcome `trust_fallback`) —

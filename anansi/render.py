@@ -133,6 +133,14 @@ _MOMENTUM_RANK = {"stalled": 2, "moving": 1, "unknown": 0}
 # from the neutral stalled rank above.
 _PUSH_SALIENCE_BONUS = 10
 
+# G3 (spec 001): global drive_pressure maps to a drive-note VERBOSITY ceiling
+# (how many NON-flagged `- drive note:` lines may surface) — salience/ordering/
+# verbosity only, NEVER imperative loudness or any literal string. 'standard'
+# == today's ceiling (3), so standard output is byte-identical. The energy
+# budget still caps FURTHER (min with this ceiling); flagged wants are exempt.
+_PRESSURE_NOTE_LIMIT = {"quiet": 1, "standard": 3, "firm": 5}
+_DEFAULT_PRESSURE_NOTE_LIMIT = 3
+
 
 def _drive_salience(item) -> float:
     """Neutral momentum salience PLUS any user-authorized pressure bonus —
@@ -142,7 +150,12 @@ def _drive_salience(item) -> float:
     if not isinstance(item, dict):
         return 0.0
     stalled_days = item.get("stalled_days")
-    momentum = "stalled" if isinstance(stalled_days, int) else item.get("momentum")
+    # G6: stalled_days == 0 means "touched today" (fresh/moving), NOT stalled.
+    momentum = (
+        "stalled"
+        if isinstance(stalled_days, int) and stalled_days > 0
+        else item.get("momentum")
+    )
     rank = _MOMENTUM_RANK.get(momentum, 0)
     bonus = 0
     if rank >= _MOMENTUM_RANK["stalled"] and _push_when_stalled(item):
@@ -166,6 +179,27 @@ def _push_when_stalled(item) -> bool:
         return True
     style = str(item.get("support_style", "") or "").strip().lower()
     return style in ("firm", "push", "firmer")
+
+
+_GOAL_WORD_RE = re.compile(r"[a-z0-9]+")
+
+
+def _goal_tokens(text):
+    """Lowercased alphanumeric word tokens of a goal text. Defensive."""
+    return _GOAL_WORD_RE.findall(str(text or "").lower())
+
+
+def _goal_text_matches(a, b) -> bool:
+    """G5: precise goal<->signal association. True when two goal texts refer to
+    the same goal: one text's whole-word token set is a subset of the other's
+    (so 'drive layer' matches 'ship the drive layer'), but NOT loose substrings
+    ('ship' no longer matches 'relationship', 'api' no longer matches
+    'therapist'). Defensive; never raises."""
+    sa = set(_goal_tokens(a))
+    sb = set(_goal_tokens(b))
+    if not sa or not sb:
+        return False
+    return sa <= sb or sb <= sa
 
 
 def enrich_goal_signals(goal_signals, goals):
@@ -192,7 +226,7 @@ def enrich_goal_signals(goal_signals, goals):
             match = None
             for goal in goal_list:
                 text = str(goal.get("text", "") or "").strip().lower()
-                if text and (text in relates or relates in text):
+                if text and _goal_text_matches(text, relates):
                     match = goal
                     break
             if match is None:
@@ -243,7 +277,7 @@ def _render_drive_note(item) -> str:
     relates = _sanitize_text(item.get("relates_to_goal", ""), 300)
     stalled_days = item.get("stalled_days")
     parts = ["relates to %s" % relates]
-    if isinstance(stalled_days, int):
+    if isinstance(stalled_days, int) and stalled_days > 0:  # G6: 0 == fresh, not stalled
         parts.append("stalled %d days" % stalled_days)
         if _push_when_stalled(item):
             # The drive effect, rendered SEPARATELY so it is inspectable —
@@ -311,7 +345,7 @@ def _render_drive_want(item) -> str:
     want = _want_text(item)
     stalled_days = _resolve_stalled_days(item)
     clause = "I want progress on %s" % want
-    if isinstance(stalled_days, int):
+    if isinstance(stalled_days, int) and stalled_days > 0:  # G6: 0 == fresh, not stalled
         clause = "I want %s moving (stalled %d days)" % (want, stalled_days)
         if _push_when_stalled(item):
             # The drive effect is rendered as a SEPARATE, visible clause: a
@@ -322,18 +356,39 @@ def _render_drive_want(item) -> str:
     return "- drive want: %s" % clause
 
 
-def _flagged_want_lines(goal_signals, goals):
+def _flagged_rank(item) -> int:
+    """The flagged_priority magnitude as a sort key (higher = more important).
+    Defensive: unparseable/absent -> 0."""
+    if not isinstance(item, dict):
+        return 0
+    try:
+        return int(item.get("flagged_priority") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _flagged_want_lines(goal_signals, goals, cap=None):
     """The first-person `- drive want:` lines for user-flagged priorities
     (DRIVE-05 never-omit). Built from the PERSISTED goals, not solely the
     model's goal_signals: a flagged goal must surface even when the model
     omitted it. Each flagged persisted goal yields one want line; if a parsed
     goal_signal matches it (carrying enriched stalled_days), that richer signal
     is used so the want line keeps the neutral momentum read. Deterministic and
-    deduplicated. Pure, never raises — returns a list (possibly empty)."""
+    deduplicated. Pure, never raises — returns a list (possibly empty).
+
+    G4: ``cap`` bounds how many wants render. Goals are ordered HIGHEST
+    flagged_priority first (stable within a rank), so the top-priority wants
+    ALWAYS render — never-omit is preserved. Only the least-critical tail is
+    withheld, and the withholding is VISIBLE: a final
+    `- drive want: [N flagged priorities withheld]` marker line, never a silent
+    drop. cap=None (or < 1) means no bound (historical behaviour)."""
     try:
         gsignals = [g for g in (goal_signals or []) if isinstance(g, dict)]
         plist = [g for g in (goals or []) if isinstance(g, dict)]
-        lines = []
+
+        # Collect flagged goals, deduped by text, then order by priority DESC.
+        # sort() is stable, so equal-priority goals keep persisted order.
+        flagged = []
         seen = set()
         for goal in plist:
             if not _is_flagged(goal):
@@ -345,25 +400,42 @@ def _flagged_want_lines(goal_signals, goals):
             if key in seen:
                 continue
             seen.add(key)
+            flagged.append((key, goal))
+        flagged.sort(key=lambda kg: _flagged_rank(kg[1]), reverse=True)
+
+        # Bound the rendered wants; the top-priority ones always survive, the
+        # withheld count is surfaced visibly (never-omit: visible, not silent).
+        withheld = 0
+        if isinstance(cap, int) and cap >= 1 and len(flagged) > cap:
+            withheld = len(flagged) - cap
+            flagged = flagged[:cap]
+
+        lines = []
+        for key, goal in flagged:
             # Prefer the matching enriched goal_signal (it carries stalled_days
             # + pressure metadata grounded at read time); fall back to the
             # persisted goal so a model omission cannot drop a flagged want.
             source = goal
             for sig in gsignals:
                 relates = str(sig.get("relates_to_goal", "") or "").strip().lower()
-                if relates and (relates in key or key in relates):
+                if relates and _goal_text_matches(relates, key):
                     merged = dict(goal)
                     merged.update(sig)
                     source = merged
                     break
             lines.append(_render_drive_want(source))
+        if withheld:
+            lines.append(
+                "- drive want: [%d flagged priorities withheld]" % withheld
+            )
         return lines
     except Exception:
         return []
 
 
 def render_block(signals, snapshot=None, goals=None,
-                 energy_budget=None) -> Optional[str]:
+                 energy_budget=None, pressure=None,
+                 flagged_want_cap=None) -> Optional[str]:
     """Render the sanitized [anansi appraisal] block, or None (APPR-04/05).
 
     Top-3 per category, observational phrasing, every interpolated text
@@ -391,6 +463,14 @@ def render_block(signals, snapshot=None, goals=None,
     line is EXEMPT (never-omit beats the budget — DRIVE-05 > DRIVE-06):
     the budget only trims the non-flagged drive notes, never the protected
     flagged prefix. Fail-open: a malformed budget falls back to no cap.
+
+    ``pressure`` (G3, spec 001) is the global drive_pressure level
+    (quiet|standard|firm). It sets the drive-note VERBOSITY ceiling only
+    (salience/ordering/verbosity, never imperative loudness or any literal
+    string): quiet surfaces fewer non-flagged notes, firm more, and 'standard'
+    keeps the historical ceiling so standard output is byte-identical. The
+    energy budget still caps FURTHER (min with the pressure ceiling), and
+    flagged wants remain exempt. A malformed pressure falls back to standard.
     """
     if not isinstance(signals, dict):
         return None
@@ -411,7 +491,7 @@ def render_block(signals, snapshot=None, goals=None,
     # DRIVE-05 never-omit: flagged-priority want lines render FIRST, directly
     # after SENTINEL + FRAMING, so they sit OUTSIDE the truncation pop range
     # (the cap loop below pops from the tail and stops at protected_count).
-    flagged_wants = _flagged_want_lines(goal_signals, goals)
+    flagged_wants = _flagged_want_lines(goal_signals, goals, cap=flagged_want_cap)
     # The persisted-goal texts already voiced as first-person want lines — used
     # to skip re-rendering the same goal as a THIRD-PERSON `- drive note:` below
     # (no duplicate, and the flagged item is never the dropped 4th note).
@@ -467,7 +547,7 @@ def render_block(signals, snapshot=None, goals=None,
     for item in _order_goal_signals(goal_signals):
         relates = str(item.get("relates_to_goal", "") or "").strip().lower()
         if relates and any(
-            relates in t or t in relates for t in flagged_goal_texts
+            _goal_text_matches(relates, t) for t in flagged_goal_texts
         ):
             continue  # already rendered as a protected first-person want line
         non_flagged_signals.append(item)
@@ -478,12 +558,18 @@ def render_block(signals, snapshot=None, goals=None,
     # protected prefix above and are NOT in this list, so the budget can never
     # drop them (never-omit beats the budget — DRIVE-05 > DRIVE-06). Fail-open:
     # a non-int budget leaves the standing top-3 ceiling in place.
-    note_limit = 3
+    # G3: drive_pressure sets the drive-note ceiling (quiet<standard<firm);
+    # 'standard' keeps the historical 3 so standard output is byte-identical.
+    # A malformed/unknown pressure falls back to the standard ceiling.
+    base_note_limit = _PRESSURE_NOTE_LIMIT.get(
+        str(pressure or "standard").strip().lower(), _DEFAULT_PRESSURE_NOTE_LIMIT
+    )
+    note_limit = base_note_limit
     try:
         if energy_budget is not None:
-            note_limit = max(0, min(3, int(energy_budget)))
+            note_limit = max(0, min(base_note_limit, int(energy_budget)))
     except (TypeError, ValueError):
-        note_limit = 3
+        note_limit = base_note_limit
     for item in non_flagged_signals[:note_limit]:
         lines.append(_render_drive_note(item))
     if searches:

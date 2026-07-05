@@ -274,3 +274,95 @@ def test_enrich_grounds_signal_in_persisted_momentum():
     assert "stalled 6 days" in note
     assert "push zone" in note
     assert_no_directive_language(block)
+
+
+# ---------------------------------------------------------------------------
+# G5: precise goal<->signal matching — no loose-substring false positives
+# ---------------------------------------------------------------------------
+
+
+def test_matching_drops_substring_false_positives():
+    """A signal that merely shares a SUBSTRING with a goal no longer
+    false-matches: 'ship' does not associate with a 'relationship' goal, 'api'
+    not with a 'therapist' goal (the enriched stalled momentum does NOT leak
+    across)."""
+    goal_signals = [
+        {"relates_to_goal": "ship", "confidence": 0.9},
+        {"relates_to_goal": "api", "confidence": 0.9},
+    ]
+    goals = [
+        {"text": "relationship", "status": "active",
+         "momentum": {"momentum": "stalled", "stalled_days": 4, "salience": 1.0}},
+        {"text": "therapist", "status": "active",
+         "momentum": {"momentum": "stalled", "stalled_days": 4, "salience": 1.0}},
+    ]
+    enriched = render.enrich_goal_signals(goal_signals, goals)
+    for sig in enriched:
+        assert "stalled_days" not in sig  # no spurious association
+
+
+def test_matching_keeps_whole_word_associations():
+    """Legitimate whole-word associations still fire — a 'drive layer' signal
+    matches a 'ship the drive layer' goal (token subset)."""
+    goal_signals = [{"relates_to_goal": "drive layer", "confidence": 0.9}]
+    goals = [{"text": "ship the drive layer", "status": "active",
+              "momentum": {"momentum": "stalled", "stalled_days": 6, "salience": 1.0}}]
+    enriched = render.enrich_goal_signals(goal_signals, goals)
+    assert enriched[0]["stalled_days"] == 6
+
+
+# ---------------------------------------------------------------------------
+# G6: stalled_days == 0 reads as fresh/moving, never as stalled
+# ---------------------------------------------------------------------------
+
+
+def test_stalled_days_zero_reads_as_fresh_in_note():
+    """stalled_days == 0 means touched-today (fresh), NOT stalled — no
+    'stalled 0 days' clause in the drive note."""
+    fresh = appraisal.parse_signals(
+        {"goal_signals": [
+            {"relates_to_goal": "just touched", "confidence": 0.9, "stalled_days": 0}
+        ]},
+        0.6,
+    )
+    block = render.render_block(fresh)
+    assert block is not None
+    note = next(l for l in block.split("\n") if l.startswith("- drive note:"))
+    assert "stalled" not in note  # 0 days is NOT a stalled read
+    assert "relates to just touched" in note
+    assert_no_directive_language(block)
+
+
+def test_stalled_days_zero_want_line_is_fresh():
+    """A flagged goal with stalled_days 0 renders a well-formed fresh want line
+    ('I want progress on ...'), never 'stalled 0 days'."""
+    goal = {"text": "fresh flagged goal", "status": "active", "flagged_priority": 1,
+            "momentum": {"momentum": "moving", "stalled_days": 0, "salience": 0.0}}
+    signals = appraisal.parse_signals(
+        {"salient_observations": [{"text": "carrier obs", "confidence": 0.9}]}, 0.6)
+    block = render.render_block(signals, goals=[goal])
+    assert block is not None
+    want = next(l for l in block.split("\n") if l.startswith("- drive want:"))
+    assert "stalled" not in want
+    assert "fresh flagged goal" in want
+    assert_no_directive_language(block)
+
+
+def test_stalled_days_zero_does_not_rank_as_stalled():
+    """A 0-day goal ranks MOVING (not stalled), so a genuinely stalled goal
+    (>0) still renders before it, and the fresh goal shows no stalled clause."""
+    parsed = appraisal.parse_signals(
+        {"goal_signals": [
+            {"relates_to_goal": "fresh goal", "confidence": 0.8, "stalled_days": 0},
+            {"relates_to_goal": "old goal", "confidence": 0.8, "stalled_days": 5},
+        ]},
+        0.6,
+    )
+    block = render.render_block(parsed)
+    assert block is not None
+    lines = [l for l in block.split("\n") if l.startswith("- drive note:")]
+    old_idx = next(i for i, l in enumerate(lines) if "old goal" in l)
+    fresh_idx = next(i for i, l in enumerate(lines) if "fresh goal" in l)
+    assert old_idx < fresh_idx  # genuinely stalled first; 0-day is moving
+    assert "stalled" not in lines[fresh_idx]
+    assert_no_directive_language(block)

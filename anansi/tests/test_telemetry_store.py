@@ -220,6 +220,26 @@ def test_telemetry_summary_reflect_vocabulary(tmp_path):
     assert summary["p50_wall_ms"] == 120  # ok row only; reflect_ok wall excluded
 
 
+def test_telemetry_summary_config_degraded_is_non_failure(tmp_path):
+    """G7 (audit #5): a config_degraded row is an OBSERVATION, not a failure —
+    excluded from failure_count and never surfaced as last_error."""
+    db = tmp_path / "state.db"
+    assert store.ensure_db(db) is True
+    store.record_telemetry("ok", wall_ms=100, db_path=db)
+    store.record_telemetry(
+        "config_degraded",
+        error="drive_pressure: rejected <str len=8>, applied 'standard'",
+        db_path=db,
+    )
+    store.record_telemetry("timeout", error="deadline hit", db_path=db)
+
+    summary = store.telemetry_summary(db)
+    assert summary is not None
+    assert summary["by_outcome"]["config_degraded"] == 1
+    assert summary["failure_count"] == 1  # timeout only; config_degraded excluded
+    assert summary["last_error"] == "deadline hit"  # NOT the config_degraded row
+
+
 def test_telemetry_summary_absent_db_returns_none(tmp_path):
     assert store.telemetry_summary(tmp_path / "absent" / "state.db") is None
     assert not (tmp_path / "absent" / "state.db").exists()  # never creates
@@ -245,7 +265,7 @@ def test_get_cfg_defaults_when_host_config_unavailable(monkeypatch):
         "confidence_threshold": 0.6,
         "deadline_seconds": 8.0,
         "history_chars": 4000,
-        "model": None,
+        "model": "gpt-4o-mini",
         "max_tokens": 700,
         "reflection_enabled": True,
         "reflect_every_n_turns": 5,
@@ -255,6 +275,7 @@ def test_get_cfg_defaults_when_host_config_unavailable(monkeypatch):
         "drive_domains": [],
         "drive_energy_budget": 3,
         "drive_pressure": "standard",
+        "drive_flagged_want_cap": 5,
     }
     # SAFE-01 (R1, 2026-06-10): the in-code default deadline is 8.0s.
     assert cfg["deadline_seconds"] == config.DEFAULT_DEADLINE_SECONDS == 8.0

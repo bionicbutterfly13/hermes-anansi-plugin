@@ -1,8 +1,10 @@
 # hermes-anansi-plugin
 
 Development home of **anansi** — an observational metacognitive appraisal
-plugin for [hermes-agent](https://github.com/NousResearch/hermes-agent) — plus the
-learnship planning artifacts that produced it (`.planning/`).
+plugin for [hermes-agent](https://github.com/NousResearch/hermes-agent). Development is
+spec-driven with [GitHub Spec Kit](https://github.com/github/spec-kit): governing principles
+in `.specify/memory/constitution.md`, features under `specs/`. The earlier planning history is
+preserved as a read-only archive in `.planning/`.
 
 The plugin itself lives in [`anansi/`](anansi/README.md) and is
 self-contained: that directory is what gets installed (standalone) or contributed

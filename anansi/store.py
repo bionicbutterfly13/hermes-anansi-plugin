@@ -32,7 +32,7 @@ from pathlib import Path
 
 logger = logging.getLogger("hermes.plugins.anansi.store")
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # Per-table row caps (seed values; tune later with telemetry).
 CAPS = {
@@ -96,11 +96,28 @@ _SCHEMA_DDL = (
     # flagged_priority and domain are written NOW even though only Phase 7's
     # later plans read them — schema churn is the expensive part (mirrors the
     # decay-column comment above).
+    # Schema v5 (G2, spec 001): per-goal pressure DEFINITION persists here so it
+    # round-trips the store instead of only working via injected test dicts.
+    # Unlike prior bumps, a v4 DB is upgraded IN PLACE via additive
+    # ALTER TABLE (see ensure_db) rather than quarantined — user-minted goals are
+    # priorities and must not be silently dropped (constitution Principle III,
+    # Never-Omit & Anti-Erasure). Momentum/stalled_days stay DERIVED at read time
+    # (Principle IV), so they are deliberately NOT persisted here.
     """CREATE TABLE goals           (id INTEGER PRIMARY KEY, text TEXT NOT NULL,
                                      status TEXT NOT NULL DEFAULT 'candidate'
                                      CHECK (status IN ('active','queued','backburner','candidate')),
                                      success_criteria TEXT, flagged_priority INTEGER NOT NULL DEFAULT 0,
-                                     domain TEXT, created_at TEXT, updated_at TEXT)""",
+                                     domain TEXT, created_at TEXT, updated_at TEXT,
+                                     support_style TEXT, push_when_stalled INTEGER NOT NULL DEFAULT 0,
+                                     stall_threshold_days INTEGER)""",
+)
+
+# Additive per-goal pressure columns introduced at schema v5 (G2). Used by the
+# in-place v4->v5 upgrade in ensure_db to preserve existing user goals.
+_GOALS_V5_ADDED_COLUMNS = (
+    "support_style TEXT",
+    "push_when_stalled INTEGER NOT NULL DEFAULT 0",
+    "stall_threshold_days INTEGER",
 )
 
 
@@ -225,18 +242,74 @@ def _create_fresh(path: Path) -> bool:
                 pass
 
 
+def _try_upgrade(path: Path) -> bool:
+    """Attempt an in-place ADDITIVE upgrade of an older-but-sound DB to
+    SCHEMA_VERSION. Currently handles v4 -> v5 (adds the per-goal pressure
+    columns). Returns True only if the DB now verifies at the current version;
+    otherwise False so the caller falls through to quarantine. Never raises.
+
+    Additive ALTER TABLE preserves existing rows — user-minted goals are
+    priorities and must not be silently dropped by a quarantine (constitution
+    Principle III, Never-Omit & Anti-Erasure). This is the ONE place the
+    disposable-state doctrine is relaxed, and only for a strictly additive step.
+    """
+    conn = None
+    try:
+        conn = sqlite3.connect(str(path))
+        row = conn.execute("PRAGMA quick_check").fetchone()
+        if row is None or row[0] != "ok":
+            return False
+        tables = {
+            r[0]
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        if not set(_TABLES) <= tables:
+            return False
+        row = conn.execute(
+            "SELECT value FROM meta WHERE key='schema_version'"
+        ).fetchone()
+        if row is None:
+            return False
+        if str(row[0]) == "4":
+            existing = {c[1] for c in conn.execute("PRAGMA table_info(goals)")}
+            with conn:
+                for coldef in _GOALS_V5_ADDED_COLUMNS:
+                    name = coldef.split()[0]
+                    if name not in existing:
+                        conn.execute("ALTER TABLE goals ADD COLUMN %s" % coldef)
+                conn.execute(
+                    "UPDATE meta SET value=? WHERE key='schema_version'",
+                    (str(SCHEMA_VERSION),),
+                )
+    except Exception as exc:
+        logger.warning("anansi in-place upgrade failed (will quarantine): %s", exc)
+        logger.debug("upgrade failure detail", exc_info=True)
+        return False
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return _verify_structure(path)
+
+
 def ensure_db(db_path=None) -> bool:
     """Create the DB + schema if absent; verify structure if present.
 
-    ANY structural failure (corrupt file, bad quick_check, missing table,
-    schema_version mismatch) -> quarantine then recreate fresh. Returns True
-    if a usable DB exists at exit, False otherwise. Never raises.
+    A structurally-sound older DB is upgraded in place when the step is purely
+    additive (v4 -> v5). ANY remaining structural failure (corrupt file, bad
+    quick_check, missing table, non-additive/version mismatch) -> quarantine
+    then recreate fresh. Returns True if a usable DB exists at exit, False
+    otherwise. Never raises.
     """
     try:
         path = Path(db_path) if db_path is not None else get_db_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
             if _verify_structure(path):
+                return True
+            if _try_upgrade(path):
                 return True
             _quarantine(path)
         return _create_fresh(path)
@@ -721,8 +794,9 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                         conn.execute(
                             "INSERT INTO goals"
                             " (text, status, success_criteria, flagged_priority,"
-                            " domain, created_at, updated_at)"
-                            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            " domain, created_at, updated_at,"
+                            " support_style, push_when_stalled, stall_threshold_days)"
+                            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (
                                 item.get("text"),
                                 item.get("status", "candidate"),
@@ -731,6 +805,9 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                                 item.get("domain"),
                                 now,
                                 now,
+                                item.get("support_style"),
+                                item.get("push_when_stalled", 0),
+                                item.get("stall_threshold_days"),
                             ),
                         )
                 elif key == "goals_update":
@@ -738,7 +815,9 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                     for item in payload:
                         conn.execute(
                             "UPDATE goals SET text=?, success_criteria=?,"
-                            " flagged_priority=?, domain=?, updated_at=?"
+                            " flagged_priority=?, domain=?, updated_at=?,"
+                            " support_style=?, push_when_stalled=?,"
+                            " stall_threshold_days=?"
                             " WHERE id=?",
                             (
                                 item.get("text"),
@@ -746,6 +825,9 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                                 item.get("flagged_priority", 0),
                                 item.get("domain"),
                                 now,
+                                item.get("support_style"),
+                                item.get("push_when_stalled", 0),
+                                item.get("stall_threshold_days"),
                                 item.get("id"),
                             ),
                         )
@@ -873,11 +955,13 @@ def telemetry_summary(db_path=None):
 
     Read-only URI connection — never creates files. Returns
     {"total", "by_outcome", "failure_count", "last_error", "p50_wall_ms"}.
-    Non-failures are exactly ok/trust_fallback/reflect_ok plus the
-    skipped:* and reflect_skipped:* prefixes; failures are exactly
+    Non-failures are exactly ok/trust_fallback/reflect_ok/config_degraded
+    plus the skipped:* and reflect_skipped:* prefixes; failures are exactly
     timeout/llm_error/parse_fail/reflect_timeout/reflect_llm_error/
     reflect_parse_fail (exclusion-list shape on purpose — any future
-    unknown outcome counts as a failure). last_error is the error of the
+    unknown outcome counts as a failure). config_degraded is an
+    OBSERVATION (audit #5: a provided config value was coerced away), not a
+    failure. last_error is the error of the
     newest failure row (same definition — skipped/trust_fallback/
     reflect_ok rows carry no error and are not failures), and p50_wall_ms
     is the median wall_ms over appraisal ok/trust_fallback rows only
@@ -897,12 +981,13 @@ def telemetry_summary(db_path=None):
         failure_count = sum(
             count
             for outcome, count in by_outcome.items()
-            if outcome not in ("ok", "trust_fallback", "reflect_ok")
+            if outcome not in ("ok", "trust_fallback", "reflect_ok", "config_degraded")
             and not outcome.startswith(("skipped:", "reflect_skipped:"))
         )
         row = conn.execute(
             "SELECT error FROM telemetry"
-            " WHERE outcome NOT IN ('ok', 'trust_fallback', 'reflect_ok')"
+            " WHERE outcome NOT IN ('ok', 'trust_fallback', 'reflect_ok',"
+            " 'config_degraded')"
             " AND outcome NOT LIKE 'skipped:%'"
             " AND outcome NOT LIKE 'reflect_skipped:%'"
             " ORDER BY id DESC LIMIT 1"

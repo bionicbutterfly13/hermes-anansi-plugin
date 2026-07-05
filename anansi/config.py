@@ -72,7 +72,7 @@ DEFAULT_ENABLED = True
 DEFAULT_CONFIDENCE_THRESHOLD = 0.6
 DEFAULT_DEADLINE_SECONDS = 8.0
 DEFAULT_HISTORY_CHARS = 4000
-DEFAULT_MODEL = None  # no override requested by default
+DEFAULT_MODEL = "gpt-4o-mini"  # default to cheap openai model
 DEFAULT_MAX_TOKENS = 700
 DEFAULT_REFLECTION_ENABLED = True
 DEFAULT_REFLECT_EVERY_N_TURNS = 5
@@ -88,8 +88,20 @@ DEFAULT_DRIVE_ENERGY_BUDGET = 3
 # quiet|standard|firm only — code-red is excluded from Phase 7.
 DEFAULT_DRIVE_PRESSURE = "standard"
 _DRIVE_PRESSURE_CHOICES = frozenset({"quiet", "standard", "firm"})
+# G4: bound how many flagged `- drive want:` lines render. The top-priority
+# wants ALWAYS render (never-omit); the tail is withheld VISIBLY. Floor 1 so a
+# single top flagged want always survives even at the tightest setting.
+DEFAULT_DRIVE_FLAGGED_WANT_CAP = 5
 
 _cache = None
+# G7: (key, shape) pairs for config values degraded at the last get_cfg load.
+# Read via get_degradations(); the plugin emits one telemetry row per entry on
+# session start. Kept OUT of _cache so the cfg dict shape is unchanged.
+_last_degradations = []
+
+# Recognized boolean tokens (mirrors _coerce_bool) — used only to decide whether
+# a provided bool value was HONORED vs coerced to the default.
+_BOOL_TOKENS = ("true", "yes", "on", "1", "false", "no", "off", "0")
 
 
 def _load_host_entry():
@@ -186,9 +198,84 @@ def _coerce_choice(value, default, choices):
     return default
 
 
+def _value_shape(raw) -> str:
+    """A secret-safe indicator of a REJECTED config value — never its literal
+    contents (a mistyped credential must not land in telemetry). Never raises."""
+    try:
+        if isinstance(raw, bool):
+            return "<bool>"
+        if isinstance(raw, str):
+            return "<str len=%d>" % len(raw)
+        if isinstance(raw, (int, float)):
+            return "<%s>" % type(raw).__name__
+        if isinstance(raw, (list, tuple)):
+            return "<%s len=%d>" % (type(raw).__name__, len(raw))
+        if isinstance(raw, dict):
+            return "<dict len=%d>" % len(raw)
+        if raw is None:
+            return "<none>"
+        return "<%s>" % type(raw).__name__
+    except Exception:
+        return "<unknown>"
+
+
+def _bool_honored(raw) -> bool:
+    """True iff _coerce_bool would keep the user's intent (recognized bool)."""
+    if isinstance(raw, (bool, int, float)):
+        return True
+    return isinstance(raw, str) and raw.strip().lower() in _BOOL_TOKENS
+
+
+def _num_degraded(raw, coerced) -> bool:
+    """True iff a numeric value was rejected (unparseable) or clamped away from
+    what the user wrote. A string number ('50') that parses to the same value is
+    NOT degraded (legitimate normalization)."""
+    try:
+        return float(raw) != float(coerced)
+    except (TypeError, ValueError):
+        return True
+
+
+def _config_degradations(entry, cache) -> list:
+    """(key, shape) for each value the user PROVIDED that was coerced away from
+    what they wrote — rejected or clamped. Case/whitespace/type normalization is
+    NOT flagged. Secret-safe (shape only, never the value). Never raises."""
+    out = []
+    try:
+        for key in ("enabled", "reflection_enabled", "drive_enabled"):
+            raw = entry.get(key)
+            if raw is not None and not _bool_honored(raw):
+                out.append((key, _value_shape(raw)))
+        for key in (
+            "confidence_threshold", "deadline_seconds", "history_chars",
+            "max_tokens", "reflect_every_n_turns", "reflect_max_tokens",
+            "reflect_deadline_seconds", "drive_energy_budget",
+        ):
+            raw = entry.get(key)
+            if raw is not None and _num_degraded(raw, cache.get(key)):
+                out.append((key, _value_shape(raw)))
+        raw = entry.get("drive_domains")
+        if raw is not None and not isinstance(raw, list):
+            out.append(("drive_domains", _value_shape(raw)))
+        raw = entry.get("drive_pressure")
+        if raw is not None and not (
+            isinstance(raw, str) and raw.strip().lower() in _DRIVE_PRESSURE_CHOICES
+        ):
+            out.append(("drive_pressure", _value_shape(raw)))
+    except Exception:  # detection must never break config loading (fail-open)
+        return out
+    return out
+
+
+def get_degradations() -> list:
+    """(key, shape) pairs for config values degraded at the last get_cfg load.
+    Secret-safe; never the raw value. Never raises."""
+    return list(_last_degradations)
+
+
 def get_cfg(force_reload=False) -> dict:
     """Return the effective config dict (cached). Never raises."""
-    global _cache
+    global _cache, _last_degradations
     if _cache is not None and not force_reload:
         return _cache
     entry = _load_host_entry() or {}
@@ -196,7 +283,7 @@ def get_cfg(force_reload=False) -> dict:
     if not isinstance(llm_cfg, dict):
         llm_cfg = {}
     model = llm_cfg.get("model")
-    model = model.strip() if isinstance(model, str) and model.strip() else None
+    model = model.strip() if isinstance(model, str) and model.strip() else DEFAULT_MODEL
     _cache = {
         "enabled": _coerce_bool(entry.get("enabled"), DEFAULT_ENABLED),
         "confidence_threshold": _coerce_float(
@@ -238,11 +325,19 @@ def get_cfg(force_reload=False) -> dict:
             entry.get("drive_pressure"), DEFAULT_DRIVE_PRESSURE,
             _DRIVE_PRESSURE_CHOICES,
         ),
+        "drive_flagged_want_cap": _coerce_int(
+            entry.get("drive_flagged_want_cap"),
+            DEFAULT_DRIVE_FLAGGED_WANT_CAP, 1,
+        ),
     }
+    # G7: record which provided values were coerced away (audit #5). Separate
+    # from _cache so the cfg dict shape is unchanged; never raises.
+    _last_degradations = _config_degradations(entry, _cache)
     return _cache
 
 
 def reset_cache() -> None:
     """Clear the cached config (called from on_session_start)."""
-    global _cache
+    global _cache, _last_degradations
     _cache = None
+    _last_degradations = []
