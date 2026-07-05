@@ -245,7 +245,7 @@ def test_get_cfg_defaults_when_host_config_unavailable(monkeypatch):
         "confidence_threshold": 0.6,
         "deadline_seconds": 8.0,
         "history_chars": 4000,
-        "model": None,
+        "model": "gpt-4o-mini",
         "max_tokens": 700,
         "reflection_enabled": True,
         "reflect_every_n_turns": 5,

@@ -182,7 +182,11 @@ def matrix_env(tmp_path, monkeypatch):
 
     llm = plugin_llm.make_plugin_llm_for_test(
         plugin_id="anansi",
-        policy=plugin_llm._TrustPolicy(plugin_id="anansi"),
+        policy=plugin_llm._TrustPolicy(
+            plugin_id="anansi",
+            allow_model_override=True,
+            allowed_models=frozenset({"gpt-4o-mini"}),
+        ),
         sync_caller=_delegating_caller,
     )
     anansi.register(
@@ -256,7 +260,7 @@ _DEFAULTS = {
     "confidence_threshold": 0.6,
     "deadline_seconds": 8.0,
     "history_chars": 4000,
-    "model": None,
+    "model": "gpt-4o-mini",
     "max_tokens": 700,
     "reflection_enabled": True,
     "reflect_every_n_turns": 5,

@@ -72,7 +72,7 @@ DEFAULT_ENABLED = True
 DEFAULT_CONFIDENCE_THRESHOLD = 0.6
 DEFAULT_DEADLINE_SECONDS = 8.0
 DEFAULT_HISTORY_CHARS = 4000
-DEFAULT_MODEL = None  # no override requested by default
+DEFAULT_MODEL = "gpt-4o-mini"  # default to cheap openai model
 DEFAULT_MAX_TOKENS = 700
 DEFAULT_REFLECTION_ENABLED = True
 DEFAULT_REFLECT_EVERY_N_TURNS = 5
@@ -196,7 +196,7 @@ def get_cfg(force_reload=False) -> dict:
     if not isinstance(llm_cfg, dict):
         llm_cfg = {}
     model = llm_cfg.get("model")
-    model = model.strip() if isinstance(model, str) and model.strip() else None
+    model = model.strip() if isinstance(model, str) and model.strip() else DEFAULT_MODEL
     _cache = {
         "enabled": _coerce_bool(entry.get("enabled"), DEFAULT_ENABLED),
         "confidence_threshold": _coerce_float(
