@@ -1,0 +1,40 @@
+# Source: 001-close-known-gaps at af2a0bc3a45ceef3d37c15bba567e8f865879edc.
+# These documents describe branch implementation and proposed work, not main completion.
+docs:
+  - path: .specify/memory/constitution.md
+    type: ADR
+    precedence: 0
+  - path: specs/001-close-known-gaps/checklists/requirements.md
+    type: DOC
+  - path: specs/001-close-known-gaps/contracts/config-keys.md
+    type: SPEC
+  - path: specs/001-close-known-gaps/contracts/store-goals-schema.md
+    type: SPEC
+  - path: specs/001-close-known-gaps/contracts/telemetry-outcomes.md
+    type: SPEC
+  - path: specs/001-close-known-gaps/data-model.md
+    type: SPEC
+  - path: specs/001-close-known-gaps/plan.md
+    type: SPEC
+  - path: specs/001-close-known-gaps/quickstart.md
+    type: DOC
+  - path: specs/001-close-known-gaps/research.md
+    type: DOC
+  - path: specs/001-close-known-gaps/spec.md
+    type: PRD
+  - path: specs/001-close-known-gaps/tasks.md
+    type: DOC
+  - path: specs/002-autobiographical-user-model/spec.md
+    type: PRD
+  - path: specs/003-reconsolidation-and-heartbeat/spec.md
+    type: PRD
+  - path: specs/004-interruption-lanes/spec.md
+    type: PRD
+  - path: specs/005-tuning-and-audit-surfaces/spec.md
+    type: PRD
+  - path: specs/006-deferred-v1-and-parity/spec.md
+    type: PRD
+  - path: specs/007-drive-security-verification/spec.md
+    type: PRD
+  - path: specs/BACKLOG.md
+    type: DOC

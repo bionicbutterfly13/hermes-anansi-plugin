@@ -1,9 +1,14 @@
-# Roadmap — Hermes Anansi Metacognition Plugin (v1.0)
+# Roadmap - Hermes Anansi Metacognition Plugin
+
+GSD is active as of 2026-09-10. Phases 1-7 retain historical evidence and completion claims. The imported feature branch is unmerged. Phase 8 starts by reconciling against main; checked source tasks are not fresh verification. Phase 5 has an unresolved missing historical summary.
 
 Created 2026-06-10 (autonomous ceremony). 4 coarse phases per SUMMARY.md's roadmap implications;
 ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to exactly one phase.
 
-## Phase 1 — Skeleton + State (no LLM) — ✓ Complete 2026-06-10 (verification: passed, 17/17 — network-blocked item closed same day)
+<details>
+<summary>ARCHIVED planning baseline: Phases 1-7; Phase 5 evidence remains incomplete</summary>
+
+### Phase 1: Skeleton + State (no LLM) — ✓ Complete 2026-06-10 (verification: passed, 17/17 — network-blocked item closed same day)
 
 **Goal:** A loadable, inert, state-capable plugin — proven against the live install.
 
@@ -15,7 +20,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 3. State store round-trips all tables; corrupt-DB and locked-DB scenarios degrade silently (tests green)
 4. Phase-0 validation items 1–4 from SUMMARY.md answered and recorded
 
-## Phase 2 — Appraisal Path (the core) — ✓ Complete 2026-06-10 (verification: passed, 12/12 must-haves, 49/49 tests; see 02-VERIFICATION.md)
+### Phase 2: Appraisal Path (the core) — ✓ Complete 2026-06-10 (verification: passed, 12/12 must-haves, 49/49 tests; see 02-VERIFICATION.md)
 
 **Goal:** Every eligible turn gets a grounded, capped, sanitized appraisal block — within budget.
 
@@ -28,7 +33,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 4. Quiet/duplicate turns inject nothing (suppression + throttle verified)
 5. Phase-0 items 5–7 (model quirks, contradiction fixture quality, telemetry) recorded
 
-## Phase 3 — Fail-Open Hardening + Reflection — ✓ Complete 2026-06-10 (verification: passed, 18/18 must-haves, 4/4 criteria, 105/105 tests; see 03-VERIFICATION.md)
+### Phase 3: Fail-Open Hardening + Reflection — ✓ Complete 2026-06-10 (verification: passed, 18/18 must-haves, 4/4 criteria, 105/105 tests; see 03-VERIFICATION.md)
 
 **Goal:** Nothing the plugin does can hurt a turn; reflection becomes the carrier of appraisal context across the one-turn lag — the second half of the appraisal input contract, not polish. State actually learns across sessions. *(Sharpened 2026-06-10 R2; reflection inputs = messages + assistant responses + state, never the ephemeral injected memory block.)*
 
@@ -40,7 +45,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 3. After a session discussing topic X with a contradiction, the next session's appraisal surfaces it (one-turn-lag loop demonstrated end-to-end)
 4. No directive language detectable in any rendered block (pattern test green)
 
-## Phase 4 — Packaging + Upstream PR Prep — ✓ Complete 2026-06-10 (verification: passed, 13/13 must-haves, 3/3 criteria; PR #43906 submitted then WITHDRAWN 2026-06-10 — plugin is proprietary, see research/DESIGN-REWIND-2026-06-10.md)
+### Phase 4: Packaging + Upstream PR Prep — ✓ Complete 2026-06-10 (verification: passed, 13/13 must-haves, 3/3 criteria; PR #43906 submitted then WITHDRAWN 2026-06-10 — plugin is proprietary, see research/DESIGN-REWIND-2026-06-10.md)
 
 **Goal:** Contributable artifact — in-tree layout, docs, upstream-main parity — gated on sign-off.
 
@@ -51,7 +56,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 2. `pip_dependencies: []` verified; test suite passes to host standards on upstream main
 3. PR branch + PR_BODY.md ready; submitted upstream as https://github.com/NousResearch/hermes-agent/pull/43906
 
-## Phase 5 — Proprietary Pivot State Reconciliation *(gap-closure cleanup)*
+### Phase 5: Proprietary Pivot State Reconciliation *(gap-closure cleanup)*
 
 **Goal:** Restore learnship routing after the proprietary pivot: reconcile state with the withdrawn PR, expose the next proprietary discussion phase, and account for interrupted quick-task residue.
 
@@ -61,7 +66,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 
 **Depends on:** Phase 4
 
-## Phase 6 — Proprietary User Model + Drive Design *(discussion/design only)*
+### Phase 6: Proprietary User Model + Drive Design *(discussion/design only)*
 
 **Goal:** Discuss and design the proprietary direction before implementation: layered autobiographical user model, aligned drive/goals, scheduled heartbeat, user-dopamine, worldview, and reconsolidation direction.
 
@@ -69,7 +74,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 
 **Depends on:** Phase 5 cleanup
 
-## Phase 7 — Drive / Accountability *(first proprietary implementation increment)*
+### Phase 7: Drive / Accountability *(first proprietary implementation increment)*
 
 **Goal:** Every eligible turn can surface user-minted goals with grounded progress/accountability signals — in-turn, never omitting a flagged priority — built on the existing appraisal path and the anansi SQLite store.
 
@@ -106,3 +111,107 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 | 6 | Proprietary design discussion — no v1 requirement IDs | 0 |
 | **Total** | **31 / 31 v1 requirements** | ✓ 100% |
 | 7 | DRIVE-01..06 (proprietary v2 — beyond v1 scope) | 6 |
+
+</details>
+
+## Imported Work
+
+Phase identifiers map the seven source specs; they do not impose a new total ordering. The source backlog permits parity work opportunistically and security verification at any time. Worldview precedes episodes/user-dopamine within Phase 9; reconsolidation and its bounded heartbeat follow.
+
+### Phase 8: Close Known Gaps
+
+**Goal:** Reconcile and verify the eight known gaps against main, preserving fail-open and never-omit; account for the unmerged development branch.
+
+**Depends on:** Phase 7
+
+**Requirements:** REQ-001-close-known-gaps-fr-001, REQ-001-close-known-gaps-fr-002, REQ-001-close-known-gaps-fr-003, REQ-001-close-known-gaps-fr-004, REQ-001-close-known-gaps-fr-005, REQ-001-close-known-gaps-fr-006, REQ-001-close-known-gaps-fr-007, REQ-001-close-known-gaps-fr-008, REQ-001-close-known-gaps-fr-009, REQ-001-close-known-gaps-fr-010, REQ-001-close-known-gaps-fr-011, REQ-001-close-known-gaps-fr-012
+
+**Status:** Pending; no implementation or completion implied
+
+**Source:** `specs/001-close-known-gaps/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+
+**Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
+
+### Phase 9: Autobiographical User Model
+
+**Goal:** Plan the scope recorded in specs/002-autobiographical-user-model/spec.md within the binding constitution and source acceptance contract.
+
+**Depends on:** Phase 8
+
+**Requirements:** REQ-002-autobiographical-user-model-fr-001, REQ-002-autobiographical-user-model-fr-002, REQ-002-autobiographical-user-model-fr-003, REQ-002-autobiographical-user-model-fr-004, REQ-002-autobiographical-user-model-fr-005, REQ-002-autobiographical-user-model-fr-006, REQ-002-autobiographical-user-model-fr-007, REQ-002-autobiographical-user-model-fr-008
+
+**Status:** Pending; no implementation or completion implied
+
+**Source:** `specs/002-autobiographical-user-model/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+
+**Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
+
+### Phase 10: Reconsolidation and Heartbeat
+
+**Goal:** Plan the scope recorded in specs/003-reconsolidation-and-heartbeat/spec.md within the binding constitution and source acceptance contract.
+
+**Depends on:** Phase 9
+
+**Requirements:** REQ-003-reconsolidation-and-heartbeat-fr-001, REQ-003-reconsolidation-and-heartbeat-fr-002, REQ-003-reconsolidation-and-heartbeat-fr-003, REQ-003-reconsolidation-and-heartbeat-fr-004, REQ-003-reconsolidation-and-heartbeat-fr-005, REQ-003-reconsolidation-and-heartbeat-fr-006, REQ-003-reconsolidation-and-heartbeat-fr-007
+
+**Status:** Pending; no implementation or completion implied
+
+**Source:** `specs/003-reconsolidation-and-heartbeat/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+
+**Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
+
+### Phase 11: Interruption Lanes
+
+**Goal:** Plan the scope recorded in specs/004-interruption-lanes/spec.md within the binding constitution and source acceptance contract.
+
+**Depends on:** Phase 10; separate authority gate
+
+**Requirements:** REQ-004-interruption-lanes-fr-001, REQ-004-interruption-lanes-fr-002, REQ-004-interruption-lanes-fr-003, REQ-004-interruption-lanes-fr-004, REQ-004-interruption-lanes-fr-005
+
+**Status:** Deferred; constitution authority gate before implementation
+
+**Source:** `specs/004-interruption-lanes/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+
+**Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
+
+### Phase 12: Tuning and Audit Surfaces
+
+**Goal:** Plan the scope recorded in specs/005-tuning-and-audit-surfaces/spec.md within the binding constitution and source acceptance contract.
+
+**Depends on:** Phase 10
+
+**Requirements:** REQ-005-tuning-and-audit-surfaces-fr-001, REQ-005-tuning-and-audit-surfaces-fr-002, REQ-005-tuning-and-audit-surfaces-fr-003, REQ-005-tuning-and-audit-surfaces-fr-004
+
+**Status:** Pending; no implementation or completion implied
+
+**Source:** `specs/005-tuning-and-audit-surfaces/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+
+**Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
+
+### Phase 13: Deferred v1 and Parity
+
+**Goal:** Plan the scope recorded in specs/006-deferred-v1-and-parity/spec.md within the binding constitution and source acceptance contract.
+
+**Depends on:** Source evidence and compatibility gates; opportunistic
+
+**Requirements:** REQ-006-deferred-v1-and-parity-fr-001, REQ-006-deferred-v1-and-parity-fr-002, REQ-006-deferred-v1-and-parity-fr-003, REQ-006-deferred-v1-and-parity-fr-004, REQ-006-deferred-v1-and-parity-fr-005, REQ-006-deferred-v1-and-parity-fr-006
+
+**Status:** Pending; no implementation or completion implied
+
+**Source:** `specs/006-deferred-v1-and-parity/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+
+**Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
+
+### Phase 14: Drive Security Verification
+
+**Goal:** Plan the scope recorded in specs/007-drive-security-verification/spec.md within the binding constitution and source acceptance contract.
+
+**Depends on:** Phase 7 baseline; may run at any time
+
+**Requirements:** REQ-007-drive-security-verification-fr-001, REQ-007-drive-security-verification-fr-002, REQ-007-drive-security-verification-fr-003, REQ-007-drive-security-verification-fr-004
+
+**Status:** Pending; no implementation or completion implied
+
+**Source:** `specs/007-drive-security-verification/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+
+**Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.

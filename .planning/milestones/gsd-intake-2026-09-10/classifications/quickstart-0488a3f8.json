@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/001-close-known-gaps/quickstart.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Quickstart — Validate the Gap Closure",
+  "summary": "Provides gap-specific test commands, whole-suite release checks, and environment-gated live smoke instructions with expected outcomes and exit-code meanings.",
+  "scope": ["gap closure validation", "canonical test gate", "drive tests", "configuration telemetry tests", "reflection tests", "live drive smoke", "environment prerequisites"],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

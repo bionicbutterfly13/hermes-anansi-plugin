@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/003-reconsolidation-and-heartbeat/spec.md",
+  "type": "PRD",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Feature Specification: Reconsolidation + Scheduled Heartbeat",
+  "summary": "Deferred backlog specification defines budgeted, idempotent heartbeat preparation and belief-revision propagation surfaced observationally on real turns without outbound interruptions.",
+  "scope": ["scheduled heartbeat", "reconsolidation", "worldview beliefs", "goal dependencies", "energy budget", "idempotency", "kill switch", "next-turn context"],
+  "cross_refs": ["06-CONTEXT.md:130-131", "06-CONTEXT.md:94", "06-CONTEXT.md:93-94", "06-CONTEXT.md:24-26", "USER-MODEL-SOURCES:36", "06-CONTEXT.md:33-36,163-167", "06-CONTEXT.md:169-170", "DESIGN-REWIND-2026-06-10.md:38", "DESIGN-REWIND:38", "STACK.md:64", "06-CONTEXT.md:188-189", "06-CONTEXT.md:59-60"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

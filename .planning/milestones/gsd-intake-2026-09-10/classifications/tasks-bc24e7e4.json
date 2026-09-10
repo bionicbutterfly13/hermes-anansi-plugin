@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/001-close-known-gaps/tasks.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Tasks: Anansi Completion — Close Known Gaps",
+  "summary": "Task ledger organizes eight gap closures and verification dependencies, with live provider verification explicitly left open.",
+  "scope": ["task ledger", "gap closures", "goal persistence", "drive rendering", "configuration telemetry", "live verification", "test gates", "execution dependencies"],
+  "cross_refs": ["plan.md", "spec.md", "research.md", "data-model.md", "quickstart.md", ".specify/memory/constitution.md", "contracts/store-goals-schema.md", "CHANGELOG.md", "anansi/README.md", "README"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

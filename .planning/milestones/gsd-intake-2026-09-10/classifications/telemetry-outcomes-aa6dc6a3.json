@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/001-close-known-gaps/contracts/telemetry-outcomes.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Contract — `config_degraded` telemetry outcome",
+  "summary": "Specifies config_degraded telemetry classification, secret-safe row shape, reload-scoped emission, fail-open behavior, and verification requirements.",
+  "scope": ["config_degraded", "telemetry_summary", "configuration reload", "secret redaction", "failure counts", "telemetry tests"],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

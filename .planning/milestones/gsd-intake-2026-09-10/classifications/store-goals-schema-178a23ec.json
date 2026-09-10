@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/001-close-known-gaps/contracts/store-goals-schema.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Contract — `goals` table schema v5 + migration",
+  "summary": "Defines goals schema v5, additive migration and quarantine behavior, goal-field persistence contracts, and associated migration and locked-database tests.",
+  "scope": ["goals table", "schema v5", "database migration", "database quarantine", "support_style", "push_when_stalled", "stall_threshold_days", "goal persistence", "locked-database tests"],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}
