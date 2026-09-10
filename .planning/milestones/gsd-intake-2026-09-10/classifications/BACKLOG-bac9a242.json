@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/BACKLOG.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Anansi — Remaining Promise Backlog (spec index)",
+  "summary": "Lists seven Spec Kit workstreams, agreed sequencing, excluded anti-features, and canonical design references from the July 2026 backlog.",
+  "scope": ["gap closure", "autobiographical user model", "reconsolidation", "scheduled heartbeat", "interruption lanes", "tuning and audit surfaces", "upstream parity", "security verification", "anti-features"],
+  "cross_refs": ["06-CONTEXT.md:93-94", "06-DISCUSSION-LOG.md:54-55", "001-close-known-gaps/spec.md", "002-autobiographical-user-model/spec.md", "003-reconsolidation-and-heartbeat/spec.md", "004-interruption-lanes/spec.md", "005-tuning-and-audit-surfaces/spec.md", "006-deferred-v1-and-parity/spec.md", "007-drive-security-verification/spec.md", "07-SECURITY.md", ".planning/phases/06-proprietary-user-model-drive-design/06-CONTEXT.md", ".planning/phases/06-proprietary-user-model-drive-design/06-DISCUSSION-LOG.md", ".planning/research/DESIGN-REWIND-2026-06-10.md", ".planning/research/USER-MODEL-SOURCES-2026-06-10.md", ".planning/research/MEMORY-STACK-ANALYSIS-2026-06-10.md", ".specify/memory/constitution.md"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

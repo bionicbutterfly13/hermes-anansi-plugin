@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/006-deferred-v1-and-parity/spec.md",
+  "type": "PRD",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Feature Specification: Deferred v1 Differentiators + Upstream Parity + Infra",
+  "summary": "Defines backlog requirements for host-gated memory salience filtering, upstream parity verification, affect and concern depth, network-mount WAL safeguards, and auxiliary-model routing decisions.",
+  "scope": ["memory salience filtering", "post_memory_prefetch hook", "upstream host parity", "dimensional affect", "active-concern continuity", "SQLite WAL", "network mounts", "auxiliary-model routing"],
+  "cross_refs": ["FEATURES.md", ".planning/research/MEMORY-STACK-ANALYSIS-2026-06-10.md", ".planning/research/STACK.md", ".planning/research/ARCHITECTURE.md", "FEATURES.md:44", "STACK.md:79-84", "STACK.md:64", "ARCHITECTURE.md:316", "SUMMARY.md:142-144", "SUMMARY.md:53", "spec 002"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

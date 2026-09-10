@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/007-drive-security-verification/spec.md",
+  "type": "PRD",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Feature Specification: Drive Security + Live Verification Debt",
+  "summary": "Backlog requirements seek a drive-layer threat register and recorded live evidence for goal surfacing and trust-gate fallback, permitting explicit provider-gated deferral.",
+  "scope": ["drive security", "STRIDE threat register", "live drive verification", "trust-gate fallback", "provider availability", "verification debt"],
+  "cross_refs": ["07-SECURITY.md", "07-LEARNINGS.md", "07-LEARNINGS.md:7", "07-UAT.md:21,51", "07-VERIFICATION.md:94-99", "MEMORY-STACK-ANALYSIS:116", "DECISIONS R3:39-41", "SECURITY.md", "spec-001"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

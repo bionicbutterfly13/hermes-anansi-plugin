@@ -1,0 +1,12 @@
+{
+  "revision": "5413873f51447f70138717bc758851288e13b630",
+  "files": {
+    ".planning/PROJECT.md": "6ea407af091447883f3ec054a5e97e36a3aa562205fec67ccef012de7e2a13a3",
+    ".planning/REQUIREMENTS.md": "f3250accc10a5b7504a0d78532269ad0d7a6078398a675721264c22e8f0c5d48",
+    ".planning/ROADMAP.md": "8aa3125abd0b01facbb5276ce383d4421cbe1cd300bfebd57ac4781b57cbec7f",
+    ".planning/STATE.md": "7d22f642a1114baa3553416fbe84a999e31f62c6ec826983b0860f0cd42c0a08",
+    ".planning/config.json": "8279f77af7d62244965b9c28c65cd6611b7eac3fd537938ad5e3955c234380cd",
+    "AGENTS.md": "2a91611c6e01b711859dc72cb652882ec26dc7f4377d934a71063b57c41157e2",
+    "CLAUDE.md": "c3dcfec61d6d639040150da4da9c76b0fa1ff313d0fd0131871714936b059346"
+  }
+}

@@ -2,87 +2,92 @@
 
 ## What This Is
 
-A hook-based metacognition plugin for hermes-agent (NousResearch) that ports the **subconscious
-appraisal pre-phase** from Dr. Mani's Anansi project, with all autonomy/pushiness removed. Before
-the agent answers, a fast, cheap JSON-mode LLM call surfaces instincts, salient memories,
-contradictions, and confidence signals, and injects them as a compact context block — giving the
-agent a "gut reaction" layer without giving it initiative.
+A Hermes hook plugin that supplies observational metacognitive appraisal and local
+SQLite state. Its implemented foundation and limitations are documented in
+`README.md`; historical phase artifacts record the development evidence.
 
 ## Core Value
 
-Every Hermes turn gets a grounded metacognitive appraisal (instincts + salience + contradictions)
-injected before response generation — with zero capacity for autonomous action and zero impact on
-turn reliability (strict fail-open).
+Ground appraisal in persisted state and user priorities while preserving fail-open
+turn handling and the prohibition on autonomous action.
+
+## Active Workflow
+
+GSD is the active planning workflow as of 2026-09-10,
+authorized by Dr. Mani. Use `$gsd-progress`, then the relevant GSD phase workflow.
+`.planning/PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md` and `STATE.md` are the active
+planning surface. Phase contexts carry imported decisions and constraints.
+
+The 18 tracked Spec Kit documents remain unchanged under `specs/` and
+`.specify/memory/`. Their complete text is preserved in `.planning/intel/` with
+provenance. They are source inputs, not a second active task queue. Dr. Mani's GSD
+migration direction supersedes the Spec Kit command sequence in the original
+constitution's Development Workflow section, without amending Principles I-VII.
+
+## Binding Engineering Decisions
+
+Read `.specify/memory/constitution.md` before every non-trivial change.
+
+- Fail-open remains mandatory, including failures introduced by new paths.
+- Output remains observational: no directives, autonomous tools, memory-provider
+  writes or turn gating.
+- Persisted flagged priorities must not be omitted or erased to satisfy a cap.
+- Use the single SQLite surface and read freshness-critical ground truth at read time.
+- Add no plugin dependencies; resolve paths from configuration/environment.
+- Keep drive pressure adjustable, inspectable and separate from the neutral read.
+- Make minimal changes and verify actual behavior; never weaken assertions to pass.
+
+The imported classifier's `locked: false` reflects the absence of the literal
+status marker `Accepted`, not permission to change a ratified constitution.
+These decisions remain binding by Dr. Mani's governing instruction.
+
+## Current Milestone
+
+Reconcile and verify the imported backlog against the integration baseline.
+Phase 8 addresses the known gaps; Phase 9 preserves the agreed worldview-first
+sequence, then episodes/autobiography and user-dopamine. Phase 10 captures bounded
+reconsolidation/heartbeat. Later scope and its gates remain in Phases 11-14.
+
+The source interruption exceptions in Phase 11 remain deferred under constitution
+precedence. Source cap requirements in Phase 8 must be reconciled without
+withholding flagged priorities. See `.planning/INGEST-CONFLICTS.md` for both
+precedence resolutions; source text is retained even where it cannot authorize
+implementation.
 
 ## Requirements
 
-### Validated
+The active ledger is `.planning/REQUIREMENTS.md`: 46 imported functional
+requirements remain pending, with Phase 11 deferred under constitution precedence.
+Their full acceptance contracts retain 29 success criteria and 25 user stories in
+`.planning/intel/requirements.md`. Historical v1 checkmarks remain explicitly
+separate from current verification. No feature is completed by this migration.
 
-(None yet — ship to validate)
+## Evidence and Branch Boundaries
 
-### Active
+- Integration baseline: main `5413873f51447f70138717bc758851288e13b630`.
+- Imported source: `001-close-known-gaps` at
+  `af2a0bc3a45ceef3d37c15bba567e8f865879edc`.
+- This intake does not merge that branch's runtime changes. Its checked tasks and
+  recorded test results are not current-main completion evidence.
+- The old active planning files and instructions are preserved under
+  `.planning/milestones/pre-gsd-2026-09-10/`. Existing phase evidence, decisions,
+  research and solutions remain available as history.
+- Phase 5's missing summary is unresolved historical evidence, not newly fabricated
+  completion. Deferred untracked inputs are listed in `.planning/GSD-MIGRATION.md`.
 
-- [ ] Plugin loads via hermes-agent's standard plugin mechanism (`plugin.yaml`, hook functions) with no vendored-code edits
-- [ ] `pre_llm_call` hook runs the appraisal: fast JSON-mode LLM call over (user message + raw conversation history + local SQLite appraisal state), output parsed into a compact block (≤ ~500 tokens) returned as `{"context": block}` (injected into the user message — host invariant)
-  — **AMENDED by research 2026-06-10:** the hook fires BEFORE memory prefetch (verified turn_context.py:316 vs :359-374), so the appraisal cannot see the current turn's Hindsight-injected memory; memory-derived signals come from state accumulated by prior reflection passes (deliberate one-turn lag). ✓ Accepted by Dr. Mani 2026-06-10 ("drop the ack issue"); reflection (Phase 3) is the carrier of appraisal context across the lag.
-- [ ] Appraisal is strictly fail-open: any error/timeout (LLM down, state corrupt) yields empty injection, never a crashed or blocked turn; configurable hard deadline, default 8.0s, p50 target ≤6s *(revised 2026-06-10 R1 — Dr. Mani accepted ~5s p50 / max quality; haiku appraisal is generation-bound 4.4–7.3s)*
-- [ ] Local appraisal state (lightweight affect summary, active-concern list, contradiction log, confidence/trust scores) persisted in SQLite under `$HERMES_HOME` — no Postgres, no stored procedures, no new daemons
-- [ ] `on_session_end` hook runs the reflection pass: updates appraisal state from the session transcript (observations applied locally — the Anansi "apply_subconscious_observations" equivalent, reimplemented on SQLite)
-  — **AMENDED by research 2026-06-10:** `on_session_end` fires per turn, not per session (turn_finalizer.py:410-411); cheap bookkeeping every firing, LLM reflection only on session-change or N-turn debounce, idempotent single WAL transaction.
-- [ ] Coexists with Hindsight as the active MemoryProvider — this plugin NEVER takes the memory-provider slot; it reads whatever memory context is already injected
-- [ ] Works with any configured provider (current default: anthropic / claude-sonnet-4-6); appraisal model independently configurable (small/cheap model), resolved from config — no hardcoded paths or models
-- [ ] Tests covering: hook registration, appraisal parse/inject, fail-open paths, state persistence round-trip
-- [ ] Packaged so it can be PR'd to NousResearch/hermes-agent (in-tree `plugins/` layout) while also installable standalone at `$HERMES_HOME/plugins/anansi`
+## Quality and Publication Gates
 
-### Out of Scope
+Run `./scripts/test.sh` for plugin implementation changes and appropriate targeted
+checks for planning-only changes. Live-provider behavior requires separate live
+evidence; neither a unit-test count nor setup success establishes it.
 
-- Heartbeat / always-on background cycles — the defining "pushiness" of original Anansi; explicitly dropped by Dr. Mani
-- Outreach / reach_out / unsolicited contact — same reason; appraisal-only cycle
-- Privilege ladder / backlog escalation / continuation nudges — dropped
-- Dopamine modulation — replaced by plain confidence/trust scoring
-- Postgres + AGE + RabbitMQ + Ollama + UI — original Anansi infra; plugin is SQLite-only, Docker-free
-- Memory provider implementation — Hindsight keeps the provider slot (locked decision 2026-06-09)
-- Plugin top-level `sys.path` mutation — known hermes-agent plugin-discovery design flaw (mnemosyne symlink incident); never execute path-mutating code at import time
+The repository is public by Dr. Mani's direction. Commit, push and upstream
+submission still require their applicable explicit authorization. Automatic GSD
+document commits and phase advancement are disabled for this intake.
 
-## Context
+## Historical Context
 
-- Source material: `/Volumes/Asylum/repos/hex-auto/Anansi` — `services/agent.py::run_subconscious_appraisal`
-  (fast inline JSON-mode appraisal: instincts, emotional reactions, salient memories, memory-expansion cues;
-  context = user message + memory context + affective state + goals + dopamine state),
-  `core/subconscious.py` (thin wrapper over Postgres stored procs `get_subconscious_context` /
-  `apply_subconscious_observations`).
-- Hook precedent: icarus plugin (`~/.hermes/plugins/icarus`) provides `on_session_start`, `pre_llm_call`,
-  `post_llm_call`, `on_session_end` and injects context per-turn; its fail-open patterns are the model.
-- Prior design work (2026-06-09, obs #10029): the "mnemosyne" unified-provider plan was SHELVED, but its
-  metacognition slice survives here: appraisal-only cycle, contradiction observation pipeline
-  (semantic/narrative/relational/emotional), confidence/trust scoring instead of dopamine.
-- This install: `~/.hermes`, hermes-agent at `~/.hermes/hermes-agent` branch `local-desktop-fixes`;
-  7 PRs already open upstream from this fork (contribution machinery proven).
-
-## Constraints
-
-- **Compatibility**: must not modify vendored hermes-agent code; pure plugin — update-safe
-- **Reliability**: appraisal can never degrade turn success; fail-open everywhere, bounded latency
-- **Cost**: one extra small LLM call per turn max; injected block capped (~500 tokens); appraisal model configurable to a cheap tier
-- **Privacy**: appraisal state stays local (SQLite under `$HERMES_HOME`); nothing leaves the machine beyond the LLM call itself
-- **Paths**: resolve everything from config/env (`$HERMES_HOME`) — never literal paths (standing rule)
-- **Contribution**: code quality + tests to upstream-PR standard; per-PR sign-off from Dr. Mani required before submission
-
-## Key Decisions
-
-| Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| Hook-based plugin, NOT MemoryProvider | Hindsight keeps the provider slot (locked 2026-06-09) | — Pending |
-| Keep appraisal pre-phase, drop heartbeat/outreach/privilege ladder | "Metacognition without pushiness" (Dr. Mani) | — Pending |
-| SQLite local state replaces Postgres stored procs | Docker-free, no daemons, update-safe install | — Pending |
-| Confidence/trust scoring replaces dopamine modulation | Same signal value, none of the drive mechanics | — Pending |
-| `pre_llm_call` + `on_session_end` (+ `on_session_start` state load) | Proven icarus hook surface | — Pending |
-| Develop standalone repo first, PR in-tree later | Mirrors neo4j/self-evolution repo pattern; PR needs sign-off | — Pending |
-| Appraisal inputs = message + history + SQLite state (one-turn memory lag) | pre_llm_call fires before memory prefetch — current-turn memory unreachable (research, verified) | ✓ Accepted 2026-06-10 |
-| Reflection debounced (session-change or N turns), idempotent | on_session_end fires per turn; un-debounced reflection doubles per-turn cost | — Pending |
-| Zero new pip dependencies | Host provides ctx.llm.complete_structured + stdlib sqlite3; strongest upstream-PR posture | — Pending |
-| Confidence advisory-only, schema noun-fields-only, sanitized rendering | 2026 calibration research: verbalized confidence too noisy to gate on; injection-surface defense | — Pending |
-| plugin.yaml `kind: standalone` explicit; hooks accept **kwargs | Manifest string-scan can silently coerce plugin to memory provider; dispatcher injects extra kwargs | — Pending |
-
----
-*Last updated: 2026-06-10 after autonomous new-project ceremony (self-answered under Dr. Mani's 6-hour mandate; answers grounded in HANDOFF.md, memory obs #10029/#10025, and Anansi/icarus source recon)*
+Historical technical rationale remains in `.planning/DECISIONS.md`, existing
+phase contexts and `.planning/research/`. Explicit Phase 6 supersession governs
+bounded future heartbeat/user-dopamine work; it does not authorize autonomous
+outreach, a new memory provider, background daemons or a privilege ladder.

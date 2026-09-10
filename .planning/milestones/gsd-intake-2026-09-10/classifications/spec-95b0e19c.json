@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/001-close-known-gaps/spec.md",
+  "type": "PRD",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Feature Specification: Anansi Completion — Close Known Gaps",
+  "summary": "Defines eight gap-closure user stories, twelve functional requirements, and acceptance criteria for pressure persistence, drive rendering, configuration telemetry, matching, live verification, and terminology.",
+  "scope": ["per-goal pressure", "global drive pressure", "configuration degradation telemetry", "flagged wants", "goal-to-signal matching", "fresh-goal rendering", "live smoke verification", "kill-switch terminology", "constitution compliance"],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

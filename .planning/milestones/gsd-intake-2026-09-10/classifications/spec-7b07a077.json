@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/004-interruption-lanes/spec.md",
+  "type": "PRD",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Feature Specification: Interruption Lanes (Proactive-Notify L2 + Code-Red)",
+  "summary": "Defines deferred opt-in code-red and proactive notification lanes with user-defined triggers, containment, auditability, heartbeat dependency, and a required desktop defect fix.",
+  "scope": ["code-red interruption lane", "proactive notification L2", "user-defined objective triggers", "flagged goals", "interrupt kill switch", "domain whitelist", "rate limits", "desktop cold-respawn defect", "heartbeat", "interrupt audit records"],
+  "cross_refs": ["06-DISCUSSION-LOG.md:18-19", "06-DISCUSSION-LOG.md:70-73", "06-CONTEXT.md:38-41", "06-CONTEXT.md:190-191", "06-DISCUSSION-LOG.md:15-16", "spec 003", "spec 005", "DESIGN-REWIND:53-56"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

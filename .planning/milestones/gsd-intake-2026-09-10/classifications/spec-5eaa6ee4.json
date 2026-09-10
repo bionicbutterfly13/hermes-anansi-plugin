@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/002-autobiographical-user-model/spec.md",
+  "type": "PRD",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Feature Specification: Layered Autobiographical User Model",
+  "summary": "Describes deferred, unbuilt worldview, autobiography, and user-dopamine capabilities, requiring re-scoping before implementation and preserving observational, inspectable, single-store constraints.",
+  "scope": ["worldview store", "autobiographical episodes", "autonoesis tags", "user-dopamine", "habit and motivation dynamics", "single SQLite surface", "drive effects", "domain containment"],
+  "cross_refs": [".planning/phases/06-.../06-CONTEXT.md:14-16", "06-CONTEXT.md:93-94", "06-DISCUSSION-LOG.md:54-55", "06-CONTEXT.md:97-99", "06-DISCUSSION-LOG.md:61-62", "06-CONTEXT.md:21-23", ".planning/research/USER-MODEL-SOURCES-2026-06-10.md", "06-CONTEXT.md:93", "06-DISCUSSION-LOG.md:52-53", "06-CONTEXT.md:130-131", "06-CONTEXT.md:14-16", ".planning/research/DESIGN-REWIND-2026-06-10.md:29-33", "06-CONTEXT.md:67-72", "06-CONTEXT.md:100-103", "06-CONTEXT.md:108-109", "FEATURES.md"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/001-close-known-gaps/data-model.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Phase 1 Data Model — Close Known Gaps",
+  "summary": "Specifies persisted goal pressure fields, schema v5 migration, drive configuration defaults, and redacted configuration-degradation telemetry without changing goal lifecycle states.",
+  "scope": ["Goal entity", "schema v5", "pressure-definition fields", "drive_pressure", "drive_flagged_want_cap", "config_degraded telemetry", "goal lifecycle"],
+  "cross_refs": ["contracts/store-goals-schema.md"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

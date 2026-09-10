@@ -1,0 +1,13 @@
+{
+  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/005-tuning-and-audit-surfaces/spec.md",
+  "type": "PRD",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Feature Specification: Tuning & Audit Surfaces",
+  "summary": "Deferred backlog specification defines a desktop configuration panel, multi-session under-response auditing, and a passive outbox with observational, fail-open behavior.",
+  "scope": ["desktop configuration panel", "cadence", "energy budgets", "domain whitelists", "under-response audit", "passive outbox", "configuration telemetry"],
+  "cross_refs": ["06-CONTEXT.md:60", "06-CONTEXT.md:198", "06-CONTEXT.md:194-195", "06-DISCUSSION-LOG.md:102-103", "MEMORY-STACK-ANALYSIS-2026-06-10.md:87", "spec 003", "spec 004", "spec 002"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}
