@@ -27,6 +27,107 @@ from anansi import appraisal, config, render, store
 # ---------------------------------------------------------------------------
 
 
+_INTEGER_CONFIG_CASES = (
+    ("history_chars", config.DEFAULT_HISTORY_CHARS, "4000", -1, 0, None),
+    ("max_tokens", config.DEFAULT_MAX_TOKENS, "700", 0, 1, None),
+    (
+        "reflect_every_n_turns",
+        config.DEFAULT_REFLECT_EVERY_N_TURNS,
+        "5",
+        0,
+        1,
+        50,
+    ),
+    (
+        "reflect_max_tokens",
+        config.DEFAULT_REFLECT_MAX_TOKENS,
+        "700",
+        0,
+        1,
+        None,
+    ),
+    (
+        "drive_energy_budget",
+        config.DEFAULT_DRIVE_ENERGY_BUDGET,
+        "3",
+        -1,
+        0,
+        None,
+    ),
+)
+
+
+def test_native_nonfinite_integer_values_degrade_to_defaults(monkeypatch):
+    """Every integer setting handles native non-finite floats without raising."""
+    for value in (float("inf"), float("-inf"), float("nan")):
+        for key, default, _, _, _, _ in _INTEGER_CONFIG_CASES:
+            monkeypatch.setattr(
+                config, "_load_host_entry", lambda k=key, v=value: {k: v}
+            )
+
+            cfg = config.get_cfg(force_reload=True)
+
+            assert cfg[key] == default
+            assert config.get_degradations() == [(key, "<float>", default)]
+
+
+def test_integer_config_strings_and_bounds_remain_unchanged(monkeypatch):
+    """The non-finite guard does not alter accepted or clamped finite values."""
+    for key, _, normalized, below, expected_below, upper in _INTEGER_CONFIG_CASES:
+        monkeypatch.setattr(
+            config, "_load_host_entry", lambda k=key, v=normalized: {k: v}
+        )
+        assert config.get_cfg(force_reload=True)[key] == int(normalized)
+        assert config.get_degradations() == []
+
+        monkeypatch.setattr(
+            config, "_load_host_entry", lambda k=key, v=below: {k: v}
+        )
+        assert config.get_cfg(force_reload=True)[key] == expected_below
+
+        if upper is not None:
+            monkeypatch.setattr(
+                config, "_load_host_entry", lambda k=key, v=upper + 1: {k: v}
+            )
+            assert config.get_cfg(force_reload=True)[key] == upper
+
+
+def test_nonfinite_integer_degradations_are_cached_then_reloaded(monkeypatch):
+    """A cache hit has no load or descriptor side effect; reset rebuilds once."""
+    calls = []
+    entry = {
+        key: float("inf")
+        for key, _, _, _, _, _ in _INTEGER_CONFIG_CASES
+    }
+
+    def load_entry():
+        calls.append(None)
+        return entry
+
+    monkeypatch.setattr(config, "_load_host_entry", load_entry)
+    expected = [
+        (key, "<float>", default)
+        for key, default, _, _, _, _ in _INTEGER_CONFIG_CASES
+    ]
+
+    first = config.get_cfg(force_reload=True)
+    assert config.get_degradations() == expected
+    assert config.get_cfg() == first
+    assert config.get_degradations() == expected
+    assert len(calls) == 1
+
+    config.reset_cache()
+    assert config.get_degradations() == []
+    entry = {
+        key: float("-inf")
+        for key, _, _, _, _, _ in _INTEGER_CONFIG_CASES
+    }
+    second = config.get_cfg()
+    assert second == first
+    assert config.get_degradations() == expected
+    assert len(calls) == 2
+
+
 def test_drive_domains_coerced(monkeypatch):
     """A non-list drive_domains -> []; a list with junk members -> only clean
     stripped strings survive; get_cfg never raises."""
