@@ -4,7 +4,7 @@ Captured by the authorized GSD merge-mode intake on 2026-09-10.
 
 <domain>
 Reconcile and verify the eight known gaps against main, preserving fail-open and never-omit; account for the unmerged development branch.
-Source: `specs/001-close-known-gaps/spec.md`.
+Source: `.planning/reference/001-close-known-gaps/spec.md`.
 </domain>
 
 <decisions>

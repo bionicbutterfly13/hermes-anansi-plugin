@@ -3,8 +3,8 @@
 Captured by the authorized GSD merge-mode intake on 2026-09-10.
 
 <domain>
-Plan the scope recorded in specs/004-interruption-lanes/spec.md within the binding constitution and source acceptance contract.
-Source: `specs/004-interruption-lanes/spec.md`.
+Plan the scope recorded in .planning/reference/004-interruption-lanes/spec.md within the binding constitution and source acceptance contract.
+Source: `.planning/reference/004-interruption-lanes/spec.md`.
 </domain>
 
 <decisions>

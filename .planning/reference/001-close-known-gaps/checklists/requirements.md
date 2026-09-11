@@ -40,4 +40,4 @@
   (green suite, unweakened assertions) is the measurable target, not the tool.
 - No [NEEDS CLARIFICATION] markers: the eight gaps (G1–G8) were sourced directly from the phase-7
   verification, UAT, and review artifacts, so scope is fully determined.
-- Ready for `/speckit-plan` (or `/speckit-clarify` if deeper de-risking is wanted first).
+- Source checklist complete; active planning and clarification use the GSD phase workflows.

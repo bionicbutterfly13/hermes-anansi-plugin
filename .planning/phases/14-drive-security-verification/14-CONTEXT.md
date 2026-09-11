@@ -3,8 +3,8 @@
 Captured by the authorized GSD merge-mode intake on 2026-09-10.
 
 <domain>
-Plan the scope recorded in specs/007-drive-security-verification/spec.md within the binding constitution and source acceptance contract.
-Source: `specs/007-drive-security-verification/spec.md`.
+Plan the scope recorded in .planning/reference/007-drive-security-verification/spec.md within the binding constitution and source acceptance contract.
+Source: `.planning/reference/007-drive-security-verification/spec.md`.
 </domain>
 
 <decisions>

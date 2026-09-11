@@ -1,24 +1,24 @@
 ## Hermes Anansi Metacognition Plugin Constitution
-- source: .specify/memory/constitution.md:1-117
+- source: .planning/reference/CONSTITUTION.md:1-117
 - status: proposed
 - decision:
 ````text
 DATA_A1C3E5G7_START
 <!--
-Sync Impact Report
-Version change: (template) → 1.0.0
+Workflow migration record
+Version change: 1.0.0 → 1.0.1
 Ratification: initial adoption 2026-07-05
-Modified principles: n/a (first ratification)
-Added sections:
+Modified principles: none
+Preserved sections:
   - Core Principles I–VII
   - Additional Constraints (Tech & Platform)
   - Development Workflow & Quality Gates
   - Governance
 Removed sections: none
-Templates requiring updates:
-  ✅ .specify/templates/plan-template.md — Constitution Check section is generic (gates derived from this file); no hardcoded principle drift
-  ✅ .specify/templates/spec-template.md — no constitution-specific slots to change
-  ✅ .specify/templates/tasks-template.md — no principle-driven task types to add
+Workflow changes authorized by Dr. Mani on 2026-09-10:
+  - Canonical constitution moved under .planning/
+  - Planning and execution use the GSD phase workflows
+  - Engineering invariants and release gates are unchanged
 Follow-up TODOs: none
 -->
 
@@ -101,9 +101,9 @@ paid for twice.
 
 ## Development Workflow & Quality Gates
 
-- Spec-driven flow: constitution → `speckit-specify` → `speckit-plan` → `speckit-tasks` →
-  `speckit-implement`, with `speckit-clarify` / `speckit-analyze` / `speckit-checklist` as
-  de-risking gates.
+- GSD flow: constitution → `$gsd-discuss-phase N` → `$gsd-plan-phase N` →
+  `$gsd-execute-phase N` → `$gsd-verify-work N`. Plans and tasks live in
+  `.planning/phases/`; reference documents do not authorize execution.
 - Every plan MUST pass a Constitution Check: any conflict with Principles I–VII MUST be resolved or
   explicitly justified in the plan's Complexity Tracking before implementation.
 - The full fail-open matrix and the never-omit tests are release gates; a change that would weaken
@@ -120,7 +120,7 @@ for a new principle or materially expanded section, PATCH for clarifications. Al
 MUST verify compliance with the principles above; unjustified complexity is grounds to reject a
 change.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-05 | **Last Amended**: 2026-07-05
+**Version**: 1.0.1 | **Ratified**: 2026-07-05 | **Last Amended**: 2026-09-10
 DATA_A1C3E5G7_END
 ````
 - scope: Anansi plugin; Hermes hooks; appraisal; user-flagged priorities; SQLite state; drive controls; configuration; release gates; governance. Taxonomy status is proposed because classification locked=false; binding authority is stated by the source constitution and task instruction.

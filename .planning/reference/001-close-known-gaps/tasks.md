@@ -4,9 +4,9 @@ description: "Task list for Anansi Completion — Close Known Gaps"
 
 # Tasks: Anansi Completion — Close Known Gaps
 
-**Input**: Design documents from `specs/001-close-known-gaps/`
+**Input**: Design documents from `.planning/reference/001-close-known-gaps/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/, quickstart.md,
-`.specify/memory/constitution.md`
+`.planning/reference/CONSTITUTION.md`
 
 **Tests**: INCLUDED — the spec requires each vertical to ship code + tests, and the constitution makes the
 fail-open matrix + never-omit tests release gates.
@@ -115,7 +115,7 @@ top present + marker; ≤cap → all present, no marker.
 **Goal**: documented one-command lane + honest gated outcome; run when a provider is reachable.
 **Independent test**: the command reports PASS/FAIL/INCONCLUSIVE honestly.
 
-- [x] T028 [P] [US7] Document the live-smoke closure lane in `specs/001-close-known-gaps/quickstart.md` (already drafted) and in the plugin README: exact command `$HERMES_HOME/hermes-agent/venv/bin/python scripts/live_drive_smoke.py`, env gate (HERMES_HOME, api.anthropic.com:443, host creds), exit codes 0/1/2. No harness code change.
+- [x] T028 [P] [US7] Document the live-smoke closure lane in `.planning/reference/001-close-known-gaps/quickstart.md` (already drafted) and in the plugin README: exact command `$HERMES_HOME/hermes-agent/venv/bin/python scripts/live_drive_smoke.py`, env gate (HERMES_HOME, api.anthropic.com:443, host creds), exit codes 0/1/2. No harness code change.
 - [ ] T029 [US7] When a model provider is reachable (openrouter billing restored OR `hermes auth` for nous), run the command; record PASS (exit 0) to close Criterion 1, or the honest INCONCLUSIVE reason. (Environment-gated — may remain open at ship with the lane ready.)
 
 ---

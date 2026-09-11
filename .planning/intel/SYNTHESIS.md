@@ -12,7 +12,7 @@
 
 - Locked decisions: 0
 - Proposed decisions: 1
-- Source: .specify/memory/constitution.md
+- Source: .planning/reference/CONSTITUTION.md
 - Coverage: full 117-line constitution, including Principles I–VII, additional constraints, development workflow, and governance, is preserved in decisions.md.
 
 ## Requirements
@@ -36,7 +36,7 @@
 
 ## Dependency graph
 
-- Explicit dependencies: specs/003-reconsolidation-and-heartbeat/spec.md → specs/002-autobiographical-user-model/spec.md; specs/004-interruption-lanes/spec.md → specs/003-reconsolidation-and-heartbeat/spec.md; specs/005-tuning-and-audit-surfaces/spec.md → specs/003-reconsolidation-and-heartbeat/spec.md.
+- Explicit dependencies: .planning/reference/003-reconsolidation-and-heartbeat/spec.md → .planning/reference/002-autobiographical-user-model/spec.md; .planning/reference/004-interruption-lanes/spec.md → .planning/reference/003-reconsolidation-and-heartbeat/spec.md; .planning/reference/005-tuning-and-audit-surfaces/spec.md → .planning/reference/003-reconsolidation-and-heartbeat/spec.md.
 - Cycles: 0
 - Maximum traversal depth: 3 of 50
 - Navigation-only cross references, including self-references and reciprocal plan/task links, were not dependency edges.
