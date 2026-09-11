@@ -8,6 +8,7 @@ only; plugin code goes through store.py exclusively. This is a NEW test file
 unaffected.
 """
 
+import os
 import sqlite3
 import time
 from datetime import datetime, timedelta, timezone
@@ -239,47 +240,102 @@ def test_locked_v4_db_is_unavailable_without_quarantine_or_partial_migration(tmp
 
 
 def test_persisted_pressure_authorizes_effect_only_after_its_threshold(tmp_path, monkeypatch):
+    """A real persisted snapshot authorizes only the reached threshold.
+
+    The flagged rows exercise first-person wants, while the ordinary row
+    proves the separate third-person push-zone contract.  No momentum or
+    snapshot seam is mocked: file mtimes and the SQLite timestamps provide
+    the actual four-day stalled read used by pre_llm_call.
+    """
     db = tmp_path / "state.db"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    old = datetime.now(timezone.utc) - timedelta(days=4, minutes=1)
+    for name in ("threshold-three", "threshold-five", "ordinary-three"):
+        path = repo / name
+        path.write_text(name, encoding="utf-8")
+        epoch = old.timestamp()
+        os.utime(path, (epoch, epoch))
+
     assert store.ensure_db(db) is True
     assert store.apply_deltas({"goals_add": [
         {"text": "threshold three", "status": "active", "flagged_priority": 1,
-         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 3},
+         "domain": "threshold-three", "support_style": "firm",
+         "push_when_stalled": 1, "stall_threshold_days": 3},
         {"text": "threshold five", "status": "active", "flagged_priority": 1,
-         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 5},
+         "domain": "threshold-five", "support_style": "firm",
+         "push_when_stalled": 1, "stall_threshold_days": 5},
+        {"text": "ordinary three", "status": "active", "flagged_priority": 0,
+         "domain": "ordinary-three", "support_style": "firm",
+         "push_when_stalled": 1, "stall_threshold_days": 3},
     ]}, db) is True
-    old = (datetime.now(timezone.utc) - timedelta(days=4)).isoformat()
     conn = sqlite3.connect(str(db))
     try:
         with conn:
-            conn.execute("UPDATE goals SET updated_at=?", (old,))
+            conn.execute("UPDATE goals SET updated_at=?", (old.isoformat(),))
     finally:
         conn.close()
-    monkeypatch.setattr(
-        store, "goal_momentum",
-        lambda goal, repo_root, now: {"momentum": "stalled", "stalled_days": 4, "salience": 1.0},
+
+    monkeypatch.setattr(store, "get_db_path", lambda: db)
+    monkeypatch.setattr(store, "_repo_root", lambda: repo)
+    fresh_snapshot = store.read_snapshot(db)
+    assert fresh_snapshot is not None
+    fresh_goals = {goal["text"]: goal for goal in fresh_snapshot["goals"]}
+    assert fresh_goals["threshold three"]["momentum"]["stalled_days"] == 4
+    assert fresh_goals["threshold five"]["momentum"]["stalled_days"] == 4
+
+    result = SimpleNamespace(
+        signals={
+            "instincts": [],
+            "salient_observations": [{"text": "same state", "confidence": 0.9}],
+            "contradiction_flags": [],
+            "suggested_memory_searches": [],
+            "goal_signals": [
+                {"relates_to_goal": "threshold three", "confidence": 0.9,
+                 "support_style": "quiet", "push_when_stalled": 0,
+                 "stalled_days": 0},
+                {"relates_to_goal": "threshold five", "confidence": 0.8},
+                {"relates_to_goal": "ordinary three", "confidence": 0.7},
+            ],
+            "gut_reaction": "",
+        },
+        outcome="ok", wall_ms=0, model="fake", tokens_in=0,
+        tokens_out=0, error=None,
     )
-    goals = store.read_snapshot(db)["goals"]
-    enriched = render.enrich_goal_signals([
-        {"relates_to_goal": "threshold three", "confidence": 0.9,
-         "support_style": "quiet", "push_when_stalled": 0},
-        {"relates_to_goal": "threshold five", "confidence": 0.8},
-    ], goals)
-    signals = {
-        "instincts": [], "salient_observations": [{"text": "same state", "confidence": 0.9}],
-        "contradiction_flags": [], "suggested_memory_searches": [],
-        "goal_signals": enriched, "gut_reaction": "",
-    }
-    block = render.render_block(signals, goals=goals)
-    first = next(line for line in block.split("\n") if "threshold three" in line)
-    control = next(line for line in block.split("\n") if "threshold five" in line)
-    first_note = render._render_drive_note(enriched[0])
-    control_note = render._render_drive_note(enriched[1])
-    assert "stalled 4 days" in first
-    assert "[under-support: user-authorized firmer support]" in first
-    assert "[under-support:" not in control
-    assert "[push zone: user-authorized firmer support]" in first_note
-    assert "[push zone:" not in control_note
-    assert "[push zone:" not in first
+    monkeypatch.setattr(config, "get_cfg", lambda: {
+        "enabled": True, "drive_enabled": True, "drive_domains": [],
+        "drive_energy_budget": 3, "drive_pressure": "standard",
+    })
+    monkeypatch.setattr(store, "record_telemetry", lambda *a, **kw: None)
+    monkeypatch.setattr(appraisal, "should_skip", lambda *a: None)
+    monkeypatch.setattr(appraisal, "normalize_message", lambda value: value)
+    monkeypatch.setattr(appraisal, "run_appraisal", lambda **kwargs: result)
+    anansi.register(SimpleNamespace(llm=object(), register_hook=lambda *a, **k: None))
+    anansi._session_state.update({"session_id": None, "last_msg_norm": None})
+    try:
+        output = anansi.pre_llm_call(session_id="pressure", user_message="status?")
+        assert output is not None
+        block = output["context"]
+    finally:
+        anansi._ctx = None
+
+    three_want = next(line for line in block.split("\n") if "threshold three" in line)
+    five_want = next(line for line in block.split("\n") if "threshold five" in line)
+    ordinary_note = next(line for line in block.split("\n") if "ordinary three" in line)
+    assert three_want.startswith("- drive want:")
+    assert "stalled 4 days" in three_want
+    assert "[under-support: user-authorized firmer support]" in three_want
+    assert "[push zone:" not in three_want
+    assert five_want.startswith("- drive want:")
+    assert "stalled 4 days" in five_want
+    assert "[under-support:" not in five_want
+    assert ordinary_note.startswith("- drive note:")
+    assert "[push zone: user-authorized firmer support]" in ordinary_note
+    assert "[under-support:" not in ordinary_note
+    assert not any(
+        line.startswith("- drive note:") and "threshold" in line
+        for line in block.split("\n")
+    )
 
 
 def test_pre_llm_call_passes_standard_pressure_without_changing_render_contract(tmp_path, monkeypatch):
