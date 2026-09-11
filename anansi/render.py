@@ -128,13 +128,25 @@ _MAX_TRUST_HINTS = 2
 # separate and inspectable (the stalled-days clause is unchanged; the drive
 # effect renders as its own "[push]" reason clause).
 _MOMENTUM_RANK = {"stalled": 2, "moving": 1, "unknown": 0}
-# A user-authorized push zone for a stalled goal raises ITS ordering rank
-# above an unauthorized stalled goal — a visible drive effect, kept separate
-# from the neutral stalled rank above.
-_PUSH_SALIENCE_BONUS = 10
+# Global drive pressure changes only the bounded non-flagged note ceiling and
+# the ordering bonus behind an already user-authorized push zone. ``standard``
+# reproduces the Phase 7 values exactly; firm cannot exceed the standing top-3
+# ceiling or the separate energy budget.
+_PRESSURE_NOTE_LIMIT = {"quiet": 1, "standard": 3, "firm": 3}
+_PRESSURE_SALIENCE_BONUS = {"quiet": 5, "standard": 10, "firm": 15}
+_DEFAULT_PRESSURE = "standard"
 
 
-def _drive_salience(item) -> float:
+def _coerce_pressure(value) -> str:
+    """Return a supported global pressure level without raising."""
+    try:
+        pressure = str(value or _DEFAULT_PRESSURE).strip().lower()
+    except Exception:
+        return _DEFAULT_PRESSURE
+    return pressure if pressure in _PRESSURE_NOTE_LIMIT else _DEFAULT_PRESSURE
+
+
+def _drive_salience(item, pressure=None) -> float:
     """Neutral momentum salience PLUS any user-authorized pressure bonus —
     used ONLY for ordering. The neutral read is recoverable from the
     stalled_days field (unchanged); the bonus is recoverable from the
@@ -146,7 +158,7 @@ def _drive_salience(item) -> float:
     rank = _MOMENTUM_RANK.get(momentum, 0)
     bonus = 0
     if rank >= _MOMENTUM_RANK["stalled"] and _pressure_effect_active(item):
-        bonus = _PUSH_SALIENCE_BONUS
+        bonus = _PRESSURE_SALIENCE_BONUS[_coerce_pressure(pressure)]
     try:
         confidence = float(item.get("confidence") or 0.0)
     except (TypeError, ValueError):
@@ -239,12 +251,14 @@ def enrich_goal_signals(goal_signals, goals):
         return [g for g in (goal_signals or []) if isinstance(g, dict)]
 
 
-def _order_goal_signals(goal_signals):
+def _order_goal_signals(goal_signals, pressure=None):
     """Stable descending order by drive salience: stalled (then user-pushed
     stalled) first, moving next, unknown last. Stable so equal-salience
     signals keep their input order."""
     items = [g for g in (goal_signals or []) if isinstance(g, dict)]
-    return sorted(items, key=_drive_salience, reverse=True)
+    return sorted(
+        items, key=lambda item: _drive_salience(item, pressure), reverse=True
+    )
 
 
 def _render_drive_note(item) -> str:
@@ -477,7 +491,8 @@ def render_block(signals, snapshot=None, goals=None,
     # salience but the neutral observation stays intact and the drive effect is
     # a separate, inspectable clause.
     non_flagged_signals = []
-    for item in _order_goal_signals(goal_signals):
+    pressure = _coerce_pressure(pressure)
+    for item in _order_goal_signals(goal_signals, pressure):
         relates = str(item.get("relates_to_goal", "") or "").strip().lower()
         if relates and any(
             relates in t or t in relates for t in flagged_goal_texts
@@ -491,12 +506,12 @@ def render_block(signals, snapshot=None, goals=None,
     # protected prefix above and are NOT in this list, so the budget can never
     # drop them (never-omit beats the budget — DRIVE-05 > DRIVE-06). Fail-open:
     # a non-int budget leaves the standing top-3 ceiling in place.
-    note_limit = 3
+    note_limit = _PRESSURE_NOTE_LIMIT[pressure]
     try:
         if energy_budget is not None:
-            note_limit = max(0, min(3, int(energy_budget)))
+            note_limit = max(0, min(note_limit, int(energy_budget)))
     except (TypeError, ValueError):
-        note_limit = 3
+        pass
     for item in non_flagged_signals[:note_limit]:
         lines.append(_render_drive_note(item))
     if searches:

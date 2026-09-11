@@ -14,6 +14,9 @@ build_context / render_block directly or a tmp DB — the real $HERMES_HOME is
 never touched.
 """
 
+from types import SimpleNamespace
+
+import anansi
 from anansi import appraisal, config, render, store
 
 
@@ -229,3 +232,91 @@ def test_budget_malformed_falls_back_to_top3():
     assert block is not None
     note_lines = [ln for ln in block.split("\n") if ln.startswith("- drive note:")]
     assert len(note_lines) == 3
+
+
+# ---------------------------------------------------------------------------
+# Global pressure policy — full-hook drive effects stay bounded and fail-open
+# ---------------------------------------------------------------------------
+
+
+def _run_pressure_hook(monkeypatch, pressure, drive_enabled=True):
+    """Exercise the hook with deterministic appraisal output and no live I/O."""
+    signals = _signals_with_n_goal_notes(3)
+    result = SimpleNamespace(
+        signals=signals, outcome="ok", wall_ms=0, model="fake", tokens_in=0,
+        tokens_out=0, error=None,
+    )
+    monkeypatch.setattr(config, "get_cfg", lambda: {
+        "enabled": True,
+        "drive_enabled": drive_enabled,
+        "drive_domains": [],
+        "drive_energy_budget": 3,
+        "drive_pressure": pressure,
+    })
+    monkeypatch.setattr(store, "read_snapshot", lambda: {"goals": []})
+    monkeypatch.setattr(store, "record_telemetry", lambda *a, **kw: None)
+    monkeypatch.setattr(appraisal, "should_skip", lambda *a: None)
+    monkeypatch.setattr(appraisal, "normalize_message", lambda value: value)
+    monkeypatch.setattr(appraisal, "run_appraisal", lambda **kwargs: result)
+    anansi.register(SimpleNamespace(llm=object(), register_hook=lambda *a, **k: None))
+    anansi._session_state.update({"session_id": None, "last_msg_norm": None})
+    try:
+        return anansi.pre_llm_call(session_id="pressure", user_message="status?")
+    finally:
+        anansi._ctx = None
+
+
+def test_pressure_full_hook_is_bounded_and_invalid_uses_standard(monkeypatch):
+    """Quiet, standard, and firm use only bounded non-flagged drive effects;
+    an invalid value is the byte-compatible standard fallback."""
+    outputs = {
+        pressure: _run_pressure_hook(monkeypatch, pressure)["context"]
+        for pressure in ("quiet", "standard", "firm", "not-a-pressure")
+    }
+    note_counts = {
+        pressure: len([
+            line for line in output.split("\n")
+            if line.startswith("- drive note:")
+        ])
+        for pressure, output in outputs.items()
+    }
+    assert note_counts == {
+        "quiet": 1,
+        "standard": 3,
+        "firm": 3,
+        "not-a-pressure": 3,
+    }
+    assert outputs["quiet"] != outputs["standard"]
+    assert outputs["not-a-pressure"] == outputs["standard"]
+    assert outputs["standard"] == render.render_block(
+        _signals_with_n_goal_notes(3), goals=[], energy_budget=3
+    )
+
+    pushed = {
+        "relates_to_goal": "priority", "confidence": 0.5,
+        "stalled_days": 4, "support_style": "firm",
+        "push_when_stalled": 1,
+    }
+    assert (
+        render._drive_salience(pushed, "quiet")
+        < render._drive_salience(pushed, "standard")
+        < render._drive_salience(pushed, "firm")
+    )
+
+
+def test_pressure_drive_off_preserves_no_goals_appraisal_block(monkeypatch):
+    """Drive-off strips every drive field and preserves the ordinary appraisal
+    block byte-for-byte against the equivalent no-goals render."""
+    out = _run_pressure_hook(monkeypatch, "firm", drive_enabled=False)
+    expected = render.render_block({
+        "instincts": [],
+        "salient_observations": [
+            {"text": "the topic recurs across sessions", "confidence": 0.9}
+        ],
+        "contradiction_flags": [],
+        "suggested_memory_searches": [],
+        "goal_signals": [],
+        "gut_reaction": "",
+    })
+    assert out == {"context": expected}
+    assert "- drive " not in out["context"]
