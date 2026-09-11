@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-11 - Non-finite integer configuration boundary
+
+### Fixes
+
+- Kept all five integer configuration keys fail-open for native positive and
+  negative infinity. The root cause was that `int()` raises `OverflowError` for
+  native infinity before configuration degradation descriptors and session
+  telemetry can be created.
+
+### Learnings
+
+- Defensive integer coercion must catch `OverflowError` alongside `TypeError`
+  and `ValueError`; doing so preserves documented defaults and finite bounds
+  without retaining a rejected non-finite literal or claiming live-provider
+  evidence.
+
 ## 2026-09-11 - Phase 8 review repairs
 
 ### Fixes
