@@ -515,7 +515,7 @@ def test_locked_db_during_apply_no_partial_state(env, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_master_kill_switch_disables_reflection(env):
+def test_primary_kill_switch_disables_reflection(env):
     _capture_turns(5, session_id="A")
     out = reflection.maybe_reflect(
         llm=env.llm, session_id="A", cfg=_cfg(enabled=False)
