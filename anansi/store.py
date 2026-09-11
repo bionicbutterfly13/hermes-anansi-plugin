@@ -892,8 +892,9 @@ def record_telemetry(outcome, *, wall_ms=None, model=None, tokens_in=None,
 
     The only write path besides apply_deltas(): a single quick INSERT plus
     cap eviction in one transaction — hot-path safe by design. `outcome` is
-    one of ok|timeout|parse_fail|llm_error|trust_fallback|skipped:<reason>
-    (free-form after `skipped:`). `error` is truncated to 300 chars.
+    one of ok|timeout|parse_fail|llm_error|trust_fallback|config_degraded|
+    skipped:<reason> (free-form after `skipped:`). `error` is truncated to
+    300 chars.
     Never raises; returns False on any failure (fail open, warning log only).
     """
     conn = None
@@ -943,8 +944,8 @@ def telemetry_summary(db_path=None):
 
     Read-only URI connection — never creates files. Returns
     {"total", "by_outcome", "failure_count", "last_error", "p50_wall_ms"}.
-    Non-failures are exactly ok/trust_fallback/reflect_ok plus the
-    skipped:* and reflect_skipped:* prefixes; failures are exactly
+    Non-failures are exactly ok/trust_fallback/reflect_ok/config_degraded plus
+    the skipped:* and reflect_skipped:* prefixes; failures are exactly
     timeout/llm_error/parse_fail/reflect_timeout/reflect_llm_error/
     reflect_parse_fail (exclusion-list shape on purpose — any future
     unknown outcome counts as a failure). last_error is the error of the
@@ -967,12 +968,12 @@ def telemetry_summary(db_path=None):
         failure_count = sum(
             count
             for outcome, count in by_outcome.items()
-            if outcome not in ("ok", "trust_fallback", "reflect_ok")
+            if outcome not in ("ok", "trust_fallback", "reflect_ok", "config_degraded")
             and not outcome.startswith(("skipped:", "reflect_skipped:"))
         )
         row = conn.execute(
             "SELECT error FROM telemetry"
-            " WHERE outcome NOT IN ('ok', 'trust_fallback', 'reflect_ok')"
+            " WHERE outcome NOT IN ('ok', 'trust_fallback', 'reflect_ok', 'config_degraded')"
             " AND outcome NOT LIKE 'skipped:%'"
             " AND outcome NOT LIKE 'reflect_skipped:%'"
             " ORDER BY id DESC LIMIT 1"
