@@ -117,9 +117,11 @@ class _CountingCaller:
     def __init__(self, payload):
         self.calls = 0
         self.payload = payload
+        self.messages = []
 
     def __call__(self, *, messages, model_override=None, **kwargs):
         self.calls += 1
+        self.messages.append(messages)
         if isinstance(self.payload, Exception):
             raise self.payload
         content = (
@@ -637,6 +639,54 @@ def test_drive_whitelist_suppression_full_hook(pinned_env):
     # proj-b was suppressed before the model ever saw it; never raises.
     assert "ship proj-b feature" not in out["context"]
     assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
+
+
+def test_domain_whitelist_only_exempts_positive_priorities(pinned_env):
+    """Malformed ordinary priorities stay outside the model prompt."""
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {
+                    "text": "allowed project",
+                    "status": "active",
+                    "domain": "proj-a",
+                },
+                {
+                    "text": "negative private goal",
+                    "status": "active",
+                    "domain": "private",
+                    "flagged_priority": -1,
+                },
+                {
+                    "text": "string zero private goal",
+                    "status": "active",
+                    "domain": "private",
+                    "flagged_priority": "0",
+                },
+                {
+                    "text": "positive private priority",
+                    "status": "active",
+                    "domain": "private",
+                    "flagged_priority": 2,
+                },
+            ]
+        },
+        pinned_env.db_path,
+    ) is True
+    caller = _CountingCaller(RICH_PAYLOAD)
+    pinned_env.state["cfg"] = _cfg(
+        drive_enabled=True, drive_domains=["proj-a"]
+    )
+    pinned_env.state["caller"] = caller
+
+    out = anansi.pre_llm_call(
+        session_id="priority-domain", user_message="status?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    prompt = json.dumps(caller.messages)
+    assert "negative private goal" not in prompt
+    assert "string zero private goal" not in prompt
+    assert "positive private priority" in prompt
 
 
 def test_drive_budget_cap_full_hook(pinned_env):

@@ -44,6 +44,16 @@ CAPS = {
     "goals": 50,
 }
 
+
+def _normalize_flagged_priority(value):
+    """Return zero or a positive integer for persisted priority fields."""
+    try:
+        priority = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return priority if priority > 0 else 0
+
+
 _DEFAULT_BUSY_TIMEOUT_MS = 5000
 
 _TABLES = (
@@ -585,6 +595,10 @@ def read_snapshot(db_path=None, include_decayed=False):
         # break read_snapshot's "None on any error, never raises" contract; on
         # failure goals simply carry the benign 'unknown' default.
         goals = _rows_as_dicts(conn, "goals")
+        for goal in goals:
+            goal["flagged_priority"] = _normalize_flagged_priority(
+                goal.get("flagged_priority")
+            )
         try:
             repo_root = _repo_root()
             for goal in goals:
@@ -675,7 +689,16 @@ def read_turns_since(after_id, db_path=None, limit=50):
 
 
 def _enforce_goal_cap(conn) -> None:
-    """Cap only unflagged rows; persisted flagged priorities are exempt."""
+    """Normalize malformed rows, then cap only ordinary goals."""
+    for goal_id, priority in conn.execute(
+        "SELECT id, flagged_priority FROM goals"
+    ):
+        normalized = _normalize_flagged_priority(priority)
+        if priority != normalized or not isinstance(priority, int):
+            conn.execute(
+                "UPDATE goals SET flagged_priority=? WHERE id=?",
+                (normalized, goal_id),
+            )
     conn.execute(
         "DELETE FROM goals WHERE COALESCE(flagged_priority, 0)=0"
         " AND id NOT IN"
@@ -800,7 +823,9 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                                 item.get("text"),
                                 item.get("status", "candidate"),
                                 item.get("success_criteria"),
-                                item.get("flagged_priority", 0),
+                                _normalize_flagged_priority(
+                                    item.get("flagged_priority", 0)
+                                ),
                                 item.get("domain"),
                                 now,
                                 now,
@@ -826,7 +851,10 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                         ):
                             if field in item:
                                 assignments.append("%s=?" % field)
-                                values.append(item[field])
+                                value = item[field]
+                                if field == "flagged_priority":
+                                    value = _normalize_flagged_priority(value)
+                                values.append(value)
                         assignments.append("updated_at=?")
                         values.append(now)
                         values.append(item.get("id"))
