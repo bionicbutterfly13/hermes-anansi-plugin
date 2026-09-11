@@ -490,6 +490,70 @@ def test_malformed_priorities_are_ordinary_and_cannot_evade_goal_cap(tmp_path):
     assert priorities <= {0, 3}
 
 
+def test_nonfinite_legacy_priorities_stay_readable_and_capped(tmp_path):
+    """Legacy non-finite values remain ordinary without suppressing a snapshot."""
+    db = tmp_path / "state.db"
+    assert store.ensure_db(db) is True
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {
+                    "text": "valid flagged priority",
+                    "status": "active",
+                    "flagged_priority": 4,
+                }
+            ]
+        },
+        db,
+    ) is True
+
+    legacy_values = (float("inf"), float("-inf"))
+    values = legacy_values + (float("nan"),)
+    now = datetime.now(timezone.utc).isoformat()
+    conn = sqlite3.connect(str(db))
+    try:
+        with conn:
+            conn.executemany(
+                "INSERT INTO goals "
+                "(text, status, flagged_priority, created_at, updated_at) "
+                "VALUES (?, 'active', ?, ?, ?)",
+                [
+                    ("legacy nonfinite %d-%d" % (kind, index), value, now, now)
+                    for kind, value in enumerate(legacy_values)
+                    for index in range(26 if kind == 0 else 25)
+                ],
+            )
+    finally:
+        conn.close()
+
+    snapshot = store.read_snapshot(db)
+    assert snapshot is not None
+    goals = {goal["text"]: goal for goal in snapshot["goals"]}
+    assert goals["valid flagged priority"]["flagged_priority"] == 4
+    assert all(
+        goal["flagged_priority"] == 0
+        for text, goal in goals.items()
+        if text.startswith("legacy nonfinite")
+    )
+    assert all(not render._is_flagged({"flagged_priority": value}) for value in values)
+
+    assert store.apply_deltas({}, db) is True
+    snapshot = store.read_snapshot(db)
+    assert snapshot is not None
+    goals = {goal["text"]: goal for goal in snapshot["goals"]}
+    assert goals["valid flagged priority"]["flagged_priority"] == 4
+    assert sum(goal["flagged_priority"] == 0 for goal in goals.values()) == 50
+    conn = sqlite3.connect(str(db))
+    try:
+        priorities = {
+            row[0]
+            for row in conn.execute("SELECT DISTINCT flagged_priority FROM goals")
+        }
+    finally:
+        conn.close()
+    assert priorities <= {0, 4}
+
+
 def test_legacy_goal_update_preserves_v5_drive_fields(tmp_path):
     """A v4-shaped update cannot silently remove persisted drive consent."""
     db = tmp_path / "state.db"

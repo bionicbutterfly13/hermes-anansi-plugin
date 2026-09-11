@@ -64,6 +64,7 @@ import json
 import sqlite3
 import time
 import types
+from datetime import datetime, timezone
 
 import pytest
 
@@ -687,6 +688,55 @@ def test_domain_whitelist_only_exempts_positive_priorities(pinned_env):
     assert "negative private goal" not in prompt
     assert "string zero private goal" not in prompt
     assert "positive private priority" in prompt
+
+
+def test_domain_whitelist_rejects_raw_infinite_priority(pinned_env):
+    """An off-domain legacy infinity value cannot trigger filter fallback."""
+    raw_goal = {
+        "text": "infinite private goal",
+        "status": "active",
+        "domain": "private",
+        "flagged_priority": float("inf"),
+    }
+    assert anansi._filter_goals_by_domain([raw_goal], ["proj-a"]) == []
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {
+                    "text": "valid private priority",
+                    "status": "active",
+                    "domain": "private",
+                    "flagged_priority": 2,
+                }
+            ]
+        },
+        pinned_env.db_path,
+    ) is True
+    now = datetime.now(timezone.utc).isoformat()
+    conn = sqlite3.connect(str(pinned_env.db_path))
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO goals "
+                "(text, status, flagged_priority, domain, created_at, updated_at) "
+                "VALUES (?, 'active', ?, 'private', ?, ?)",
+                ("infinite private goal", float("inf"), now, now),
+            )
+    finally:
+        conn.close()
+
+    caller = _CountingCaller(RICH_PAYLOAD)
+    pinned_env.state["cfg"] = _cfg(
+        drive_enabled=True, drive_domains=["proj-a"]
+    )
+    pinned_env.state["caller"] = caller
+    out = anansi.pre_llm_call(
+        session_id="infinite-priority", user_message="status?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    prompt = json.dumps(caller.messages)
+    assert "infinite private goal" not in prompt
+    assert "valid private priority" in prompt
 
 
 def test_fresh_persisted_goal_reaches_hook_with_zero_day_evidence(

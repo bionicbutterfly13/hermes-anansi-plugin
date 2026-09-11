@@ -340,7 +340,7 @@ def _is_flagged(item) -> bool:
     value = item.get("flagged_priority")
     try:
         return int(value) > 0
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return False
 
 

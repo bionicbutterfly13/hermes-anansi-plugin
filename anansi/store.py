@@ -49,7 +49,7 @@ def _normalize_flagged_priority(value):
     """Return zero or a positive integer for persisted priority fields."""
     try:
         priority = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
     return priority if priority > 0 else 0
 
