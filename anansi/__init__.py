@@ -38,14 +38,19 @@ def _filter_goals_by_domain(goals, drive_domains):
     returns the UNFILTERED goals (a filter bug must never crash the hook or
     silently drop everything)."""
     try:
-        if not goals or not drive_domains:
-            return goals
+        active_goals = [
+            goal for goal in (goals or [])
+            if isinstance(goal, dict) and goal.get("status") == "active"
+        ]
+        if not drive_domains:
+            return active_goals
         allowed = {str(d).strip() for d in drive_domains if str(d).strip()}
         if not allowed:
-            return goals
+            return active_goals
         kept = [
-            g for g in goals
-            if isinstance(g, dict) and str(g.get("domain") or "").strip() in allowed
+            goal for goal in active_goals
+            if goal.get("flagged_priority")
+            or str(goal.get("domain") or "").strip() in allowed
         ]
         return kept
     except Exception:

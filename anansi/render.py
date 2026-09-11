@@ -388,7 +388,7 @@ def _flagged_want_lines(goal_signals, goals):
         lines = []
         seen = set()
         for goal in plist:
-            if not _is_flagged(goal):
+            if goal.get("status") != "active" or not _is_flagged(goal):
                 continue
             text = str(goal.get("text", "") or "").strip()
             if not text:
@@ -424,18 +424,18 @@ def render_block(signals, snapshot=None, goals=None,
 
     When a snapshot is provided, up to 2 trust scores below 0.4 (lowest
     first) append advisory "- trust note: low confidence on X" lines
-    (REFL-05 — never a gate). Empty-signal suppression is UNCHANGED and
-    takes precedence: hints ride along only when a block already renders
-    (APPR-05 holds); hint lines participate in the existing token cap.
+    (REFL-05 — never a gate). Empty successful appraisals remain suppressed
+    unless persisted active flagged wants must surface; hint lines participate
+    in the existing token cap.
 
     ``goals`` (DRIVE-05, Phase 7) is the persisted goals slice. User-flagged
     priorities (``flagged_priority``) render a FIRST-PERSON `- drive want:`
     line at the TOP of the block (right after the sentinel + framing) and are
     EXEMPT from both the per-category `[:3]` slice and the token-cap
     trailing-line-drop — a flagged priority is NEVER silently omitted (the
-    drive red line). Empty-signal suppression (APPR-05) still takes precedence:
-    a flagged goal does NOT manufacture a block when there are zero signals;
-    it only guarantees visibility WHEN a block already renders.
+    drive red line). A successful empty signal mapping still renders persisted
+    active flagged wants; actual appraisal failures return ``signals is None``
+    before this renderer runs.
 
     ``energy_budget`` (DRIVE-06, Phase 7) is the per-turn energy/attention cap
     on how many NON-flagged drive lines (`- drive note:`) surface this turn.
@@ -453,24 +453,24 @@ def render_block(signals, snapshot=None, goals=None,
     goal_signals = signals.get("goal_signals") or []
     gut = str(signals.get("gut_reaction") or "").strip()
 
-    # Empty-signal suppression FIRST: no block, no header (APPR-05). A flagged
-    # goal does NOT manufacture a block — surfacing rides a block that already
-    # renders from real appraisal signals; it never forces one.
-    if not (instincts or observations or contradictions or searches
-            or goal_signals or gut):
-        return None
-
     # DRIVE-05 never-omit: flagged-priority want lines render FIRST, directly
     # after SENTINEL + FRAMING, so they sit OUTSIDE the truncation pop range
     # (the cap loop below pops from the tail and stops at protected_count).
     flagged_wants = _flagged_want_lines(goal_signals, goals)
+    # A successful appraisal may contain no model signals. Persisted active
+    # flagged priorities still surface in that case; actual appraisal failure
+    # is distinguished by pre_llm_call's ``signals is None`` return path.
+    if not (instincts or observations or contradictions or searches
+            or goal_signals or gut or flagged_wants):
+        return None
     # The persisted-goal texts already voiced as first-person want lines — used
     # to skip re-rendering the same goal as a THIRD-PERSON `- drive note:` below
     # (no duplicate, and the flagged item is never the dropped 4th note).
     flagged_goal_texts = {
         str(g.get("text", "") or "").strip().lower()
         for g in (goals or [])
-        if isinstance(g, dict) and _is_flagged(g) and g.get("text")
+        if isinstance(g, dict) and g.get("status") == "active"
+        and _is_flagged(g) and g.get("text")
     }
 
     lines = [SENTINEL, FRAMING]
