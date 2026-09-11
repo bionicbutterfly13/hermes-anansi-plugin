@@ -14,6 +14,22 @@ Source: `.planning/reference/001-close-known-gaps/spec.md`.
 - Apply `.planning/INGEST-CONFLICTS.md`: flagged priorities cannot be withheld by a cap; interruption exceptions are not approved under the current constitution.
 - Dependencies: Phase 7. Phase numbers alone add no dependencies.
 - State: Pending; no implementation or completion implied.
+
+## Firm-pressure decision, 2026-09-11
+
+Dr. Mani delegated the behavior choice: "i have no idea- choose best".
+For ordinary non-flagged notes in firm mode, prioritize the longest-stalled
+goals among those with existing user-authorized pressure whose persisted stall
+threshold has been reached. Use real read-time stalled days. Keep unauthorized
+goals on their existing ordering policy, standard output unchanged, and the
+three-note/energy-budget ceilings intact. Equal ages retain the existing
+confidence ordering and stable input-order ties. Never manufacture pressure
+authorization or exclude a flagged priority to make room.
+
+Acceptance must compare actual full-hook output for identical persisted inputs:
+firm visibly changes eligible note order, standard preserves its baseline order,
+quiet remains bounded, and drive-off preserves ordinary appraisal. The earlier
+uniform score bonus alone did not satisfy this requirement.
 </decisions>
 
 <specifics>

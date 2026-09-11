@@ -19,7 +19,8 @@
     "tdd_mode": false,
     "nyquist_validation": true,
     "ai_integration_phase": true,
-    "auto_advance": false
+    "auto_advance": false,
+    "_auto_chain_active": false
   },
   "parallelization": {
     "enabled": true,

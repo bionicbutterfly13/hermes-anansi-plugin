@@ -6,7 +6,7 @@
     {
       "number": "8",
       "name": "Close Known Gaps",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "9",
@@ -41,8 +41,8 @@
   ],
   "next": {
     "command": "/gsd:progress --next",
-    "label": "Advance to the next step",
-    "reason": "Phase 8 of 7 · 0% · executing"
+    "label": "Advance to the next step (plan phase 09)",
+    "reason": "Phase 09 of 7 — needs a plan"
   },
-  "updated_at": "2026-09-10T22:15:21.266Z"
+  "updated_at": "2026-09-11T16:11:34.388Z"
 }
