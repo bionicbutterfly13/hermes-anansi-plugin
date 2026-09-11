@@ -1,5 +1,5 @@
 ## Phase 1 Data Model — Close Known Gaps
-- source: specs/001-close-known-gaps/data-model.md
+- source: .planning/reference/001-close-known-gaps/data-model.md
 - type: schema
 - content:
 ````text
@@ -67,7 +67,7 @@ DATA_B2D4F6H8_END
 ````
 
 ## Implementation Plan: Anansi Completion — Close Known Gaps
-- source: specs/001-close-known-gaps/plan.md
+- source: .planning/reference/001-close-known-gaps/plan.md
 - type: protocol
 - content:
 ````text
@@ -76,7 +76,7 @@ DATA_C3E5G7I9_START
 
 **Branch**: `001-close-known-gaps` | **Date**: 2026-07-05 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `specs/001-close-known-gaps/spec.md`
+**Input**: Feature specification from `.planning/reference/001-close-known-gaps/spec.md`
 
 ## Summary
 
@@ -138,7 +138,7 @@ module-local doctrine.
 ### Documentation (this feature)
 
 ```text
-specs/001-close-known-gaps/
+.planning/reference/001-close-known-gaps/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 — decisions per gap (grounded in code)
 ├── data-model.md        # Phase 1 — Goal pressure columns, config keys, telemetry event
@@ -148,8 +148,8 @@ specs/001-close-known-gaps/
 │   ├── config-keys.md           # drive_pressure + flagged-want cap key contracts
 │   └── telemetry-outcomes.md    # config_degraded outcome contract
 ├── checklists/
-│   └── requirements.md  # (from /speckit-specify) — all green
-└── tasks.md             # Phase 2 — /speckit-tasks (NOT created here)
+│   └── requirements.md  # (source requirements checklist) — all green
+└── tasks.md             # historical branch task ledger
 ```
 
 ### Source Code (repository root)
@@ -189,7 +189,7 @@ DATA_C3E5G7I9_END
 ````
 
 ## Contract — config keys
-- source: specs/001-close-known-gaps/contracts/config-keys.md
+- source: .planning/reference/001-close-known-gaps/contracts/config-keys.md
 - type: protocol
 - content:
 ````text
@@ -227,7 +227,7 @@ DATA_D4F6H8J0_END
 ````
 
 ## Contract — goals table schema v5 + migration
-- source: specs/001-close-known-gaps/contracts/store-goals-schema.md
+- source: .planning/reference/001-close-known-gaps/contracts/store-goals-schema.md
 - type: schema
 - content:
 ````text
@@ -292,7 +292,7 @@ DATA_E5G7I9K1_END
 ````
 
 ## Contract — config_degraded telemetry outcome
-- source: specs/001-close-known-gaps/contracts/telemetry-outcomes.md
+- source: .planning/reference/001-close-known-gaps/contracts/telemetry-outcomes.md
 - type: protocol
 - content:
 ````text

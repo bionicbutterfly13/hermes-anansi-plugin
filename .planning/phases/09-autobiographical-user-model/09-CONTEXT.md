@@ -3,8 +3,8 @@
 Captured by the authorized GSD merge-mode intake on 2026-09-10.
 
 <domain>
-Plan the scope recorded in specs/002-autobiographical-user-model/spec.md within the binding constitution and source acceptance contract.
-Source: `specs/002-autobiographical-user-model/spec.md`.
+Plan the scope recorded in .planning/reference/002-autobiographical-user-model/spec.md within the binding constitution and source acceptance contract.
+Source: `.planning/reference/002-autobiographical-user-model/spec.md`.
 </domain>
 
 <decisions>

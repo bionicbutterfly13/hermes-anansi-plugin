@@ -1,0 +1,48 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": null,
+  "phases": [
+    {
+      "number": "8",
+      "name": "Close Known Gaps",
+      "status": "pending"
+    },
+    {
+      "number": "9",
+      "name": "Autobiographical User Model",
+      "status": "pending"
+    },
+    {
+      "number": "10",
+      "name": "Reconsolidation and Heartbeat",
+      "status": "pending"
+    },
+    {
+      "number": "11",
+      "name": "Interruption Lanes",
+      "status": "pending"
+    },
+    {
+      "number": "12",
+      "name": "Tuning and Audit Surfaces",
+      "status": "pending"
+    },
+    {
+      "number": "13",
+      "name": "Deferred v1 and Parity",
+      "status": "pending"
+    },
+    {
+      "number": "14",
+      "name": "Drive Security Verification",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step",
+    "reason": "Phase 8 of 7 · 0% · executing"
+  },
+  "updated_at": "2026-09-10T22:15:21.266Z"
+}

@@ -3,8 +3,8 @@
 Captured by the authorized GSD merge-mode intake on 2026-09-10.
 
 <domain>
-Plan the scope recorded in specs/005-tuning-and-audit-surfaces/spec.md within the binding constitution and source acceptance contract.
-Source: `specs/005-tuning-and-audit-surfaces/spec.md`.
+Plan the scope recorded in .planning/reference/005-tuning-and-audit-surfaces/spec.md within the binding constitution and source acceptance contract.
+Source: `.planning/reference/005-tuning-and-audit-surfaces/spec.md`.
 </domain>
 
 <decisions>

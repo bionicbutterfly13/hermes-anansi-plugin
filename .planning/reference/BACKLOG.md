@@ -1,6 +1,6 @@
 # Anansi — Remaining Promise Backlog (spec index)
 
-Every promised-but-unbuilt or unverified item for the anansi plugin, captured as Spec Kit specs so
+Every promised-but-unbuilt or unverified item for the anansi plugin, captured as legacy planning specs so
 nothing is lost. Sourced from the `.planning/` archive (Phase 6 design, Phase 7 verification/UAT/learnings,
 DECISIONS, HANDOFF, ROADMAP, research/) and cross-checked against `anansi/` code on 2026-07-05.
 
@@ -37,4 +37,4 @@ after, each gated on its own precondition.
 - `.planning/research/DESIGN-REWIND-2026-06-10.md`
 - `.planning/research/USER-MODEL-SOURCES-2026-06-10.md`
 - `.planning/research/MEMORY-STACK-ANALYSIS-2026-06-10.md`
-- `.specify/memory/constitution.md` (governs all of the above)
+- `.planning/reference/CONSTITUTION.md` (governs all of the above)

@@ -3,8 +3,8 @@
 Captured by the authorized GSD merge-mode intake on 2026-09-10.
 
 <domain>
-Plan the scope recorded in specs/003-reconsolidation-and-heartbeat/spec.md within the binding constitution and source acceptance contract.
-Source: `specs/003-reconsolidation-and-heartbeat/spec.md`.
+Plan the scope recorded in .planning/reference/003-reconsolidation-and-heartbeat/spec.md within the binding constitution and source acceptance contract.
+Source: `.planning/reference/003-reconsolidation-and-heartbeat/spec.md`.
 </domain>
 
 <decisions>

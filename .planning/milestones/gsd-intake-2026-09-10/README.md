@@ -1,11 +1,12 @@
-# Historical GSD intake receipts
+# Historical GSD intake classifications
 
-These 18 classifier outputs record the verified 2026-09-10 ingestion. Their
-absolute source paths and path-derived filenames identify the original temporary
-migration worktree; they are historical receipts, not portable live input paths.
-All source files remain at the repository-relative paths in
-`../../ingest-manifest.yaml`. A new official GSD intake regenerates classifications
-for its current checkout under `.planning/intel/classifications/`.
+These 18 records describe the verified 2026-09-10 ingestion. During the later
+workflow cleanup, source paths were normalized to current repository-relative
+GSD locations, framework labels were removed, and the constitution's obsolete
+template cross-references were dropped. Types, decisions and precedence remain
+unchanged. Filenames retain the original path-derived identifiers.
 
-The complete extracted source content remains in `.planning/intel/`. The
-classification JSON bytes are unchanged from the validated run.
+Original receipt bytes remain in commit
+`eb228d788fc474128d2c74514ffe44ab1052a253`. These normalized historical records
+are not a fresh classification run. The current source manifest is
+`../../ingest-manifest.yaml`; extracted content remains in `.planning/intel/`.

@@ -15,6 +15,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 **Requirements:** PLUG-01, PLUG-02, PLUG-03, PLUG-04, STATE-01, STATE-02, STATE-03, STATE-04, STATE-05
 
 **Success criteria:**
+
 1. `hermes plugins enable anansi` loads the plugin; `HERMES_PLUGINS_DEBUG=1` shows hooks registered, kind=standalone
 2. No-op hooks fire across a real turn without any effect on output or latency
 3. State store round-trips all tables; corrupt-DB and locked-DB scenarios degrade silently (tests green)
@@ -27,6 +28,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 **Requirements:** APPR-01, APPR-02, APPR-03, APPR-04, APPR-05, APPR-06, APPR-07, APPR-08, OBS-01
 
 **Success criteria:**
+
 1. A real `hermes` turn shows a `[anansi appraisal]` block with instincts/salience signals grounded in the actual message + state
 2. Telemetry shows p50 ≤6s appraisal wall time within the 8.0s default deadline, one LLM call per eligible turn, outcome distribution visible *(revised 2026-06-10 R1 — original ≤1.0s; Dr. Mani accepted ~5s p50 / max quality)*
 3. Kill switch off → zero appraisal calls; trust-gate denial → automatic fallback to host model (verified)
@@ -40,6 +42,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 **Requirements:** SAFE-01, SAFE-02, SAFE-03, SAFE-04, REFL-01, REFL-02, REFL-03, REFL-04, REFL-05
 
 **Success criteria:**
+
 1. Full fail-open matrix green (timeout, trust, malformed JSON, truncation, content:null, DB states, missing config) — no case raises or blocks
 2. Reflection runs only on session-change/N-turn debounce; double-firing produces identical state (idempotence test)
 3. After a session discussing topic X with a contradiction, the next session's appraisal surfaces it (one-turn-lag loop demonstrated end-to-end)
@@ -52,6 +55,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 **Requirements:** PKG-01, PKG-02, PKG-03, PKG-04
 
 **Success criteria:**
+
 1. Plugin installs cleanly in both layouts (standalone `$HERMES_HOME/plugins/anansi` and in-tree `plugins/`)
 2. `pip_dependencies: []` verified; test suite passes to host standards on upstream main
 3. PR branch + PR_BODY.md ready; submitted upstream as https://github.com/NousResearch/hermes-agent/pull/43906
@@ -88,6 +92,7 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 - **DRIVE-06 — Containment + adjustability:** drive kill switch (separate from the appraisal kill switch) + domain whitelist + energy-budget + pressure/support-style config keys; all fail-open; drive-off path tested.
 
 **Success criteria:**
+
 1. A real turn surfaces a user-minted goal with a grounded progress/stalled signal in the appraisal block, in the first-person owned-want voice
 2. Anti-creep tests pass with the first-person carve-out; second-person directives still neutralized
 3. Never-omit / anti-complacency tests: a flagged priority always appears in surfaced guidance, and a stalled user-authorized push zone cannot be silently treated as low salience
@@ -114,6 +119,20 @@ ordering follows the FEATURES.md dependency spine. Every v1 requirement maps to 
 
 </details>
 
+## Progress
+
+These seven phases are the active imported work. Phase numbers retain the historical sequence; no active phase has been executed or completed. Dependencies and authority gates remain in the phase details below.
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 8. Close Known Gaps | 0/4 | Not started | - |
+| 9. Autobiographical User Model | 0/TBD | Not started | - |
+| 10. Reconsolidation and Heartbeat | 0/TBD | Not started | - |
+| 11. Interruption Lanes | 0/TBD | Deferred | - |
+| 12. Tuning and Audit Surfaces | 0/TBD | Not started | - |
+| 13. Deferred v1 and Parity | 0/TBD | Not started | - |
+| 14. Drive Security Verification | 0/TBD | Not started | - |
+
 ## Imported Work
 
 Phase identifiers map the seven source specs; they do not impose a new total ordering. The source backlog permits parity work opportunistically and security verification at any time. Worldview precedes episodes/user-dopamine within Phase 9; reconsolidation and its bounded heartbeat follow.
@@ -126,15 +145,34 @@ Phase identifiers map the seven source specs; they do not impose a new total ord
 
 **Requirements:** REQ-001-close-known-gaps-fr-001, REQ-001-close-known-gaps-fr-002, REQ-001-close-known-gaps-fr-003, REQ-001-close-known-gaps-fr-004, REQ-001-close-known-gaps-fr-005, REQ-001-close-known-gaps-fr-006, REQ-001-close-known-gaps-fr-007, REQ-001-close-known-gaps-fr-008, REQ-001-close-known-gaps-fr-009, REQ-001-close-known-gaps-fr-010, REQ-001-close-known-gaps-fr-011, REQ-001-close-known-gaps-fr-012
 
-**Status:** Pending; no implementation or completion implied
+**Status:** Planned; four plans passed independent review. Execution not started.
 
-**Source:** `specs/001-close-known-gaps/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+**Source:** `.planning/reference/001-close-known-gaps/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
 
 **Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
 
+**Plans:** 4 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 08-01-PLAN.md — Persist pressure settings and migrate schema v4 to v5 without treating locks as corruption.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 08-02-PLAN.md — Record secret-safe configuration degradation without changing hook output on telemetry failure.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 08-03-PLAN.md — Preserve flagged priorities end to end and ground matching, freshness, and ordering in persisted state.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 08-04-PLAN.md — Finish terminology cleanup, codify the live-smoke evidence boundary, and run the constitutional gate.
+
 ### Phase 9: Autobiographical User Model
 
-**Goal:** Plan the scope recorded in specs/002-autobiographical-user-model/spec.md within the binding constitution and source acceptance contract.
+**Goal:** Plan the scope recorded in .planning/reference/002-autobiographical-user-model/spec.md within the binding constitution and source acceptance contract.
 
 **Depends on:** Phase 8
 
@@ -142,13 +180,13 @@ Phase identifiers map the seven source specs; they do not impose a new total ord
 
 **Status:** Pending; no implementation or completion implied
 
-**Source:** `specs/002-autobiographical-user-model/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+**Source:** `.planning/reference/002-autobiographical-user-model/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
 
 **Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
 
 ### Phase 10: Reconsolidation and Heartbeat
 
-**Goal:** Plan the scope recorded in specs/003-reconsolidation-and-heartbeat/spec.md within the binding constitution and source acceptance contract.
+**Goal:** Plan the scope recorded in .planning/reference/003-reconsolidation-and-heartbeat/spec.md within the binding constitution and source acceptance contract.
 
 **Depends on:** Phase 9
 
@@ -156,13 +194,13 @@ Phase identifiers map the seven source specs; they do not impose a new total ord
 
 **Status:** Pending; no implementation or completion implied
 
-**Source:** `specs/003-reconsolidation-and-heartbeat/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+**Source:** `.planning/reference/003-reconsolidation-and-heartbeat/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
 
 **Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
 
 ### Phase 11: Interruption Lanes
 
-**Goal:** Plan the scope recorded in specs/004-interruption-lanes/spec.md within the binding constitution and source acceptance contract.
+**Goal:** Plan the scope recorded in .planning/reference/004-interruption-lanes/spec.md within the binding constitution and source acceptance contract.
 
 **Depends on:** Phase 10; separate authority gate
 
@@ -170,13 +208,13 @@ Phase identifiers map the seven source specs; they do not impose a new total ord
 
 **Status:** Deferred; constitution authority gate before implementation
 
-**Source:** `specs/004-interruption-lanes/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+**Source:** `.planning/reference/004-interruption-lanes/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
 
 **Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
 
 ### Phase 12: Tuning and Audit Surfaces
 
-**Goal:** Plan the scope recorded in specs/005-tuning-and-audit-surfaces/spec.md within the binding constitution and source acceptance contract.
+**Goal:** Plan the scope recorded in .planning/reference/005-tuning-and-audit-surfaces/spec.md within the binding constitution and source acceptance contract.
 
 **Depends on:** Phase 10
 
@@ -184,13 +222,13 @@ Phase identifiers map the seven source specs; they do not impose a new total ord
 
 **Status:** Pending; no implementation or completion implied
 
-**Source:** `specs/005-tuning-and-audit-surfaces/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+**Source:** `.planning/reference/005-tuning-and-audit-surfaces/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
 
 **Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
 
 ### Phase 13: Deferred v1 and Parity
 
-**Goal:** Plan the scope recorded in specs/006-deferred-v1-and-parity/spec.md within the binding constitution and source acceptance contract.
+**Goal:** Plan the scope recorded in .planning/reference/006-deferred-v1-and-parity/spec.md within the binding constitution and source acceptance contract.
 
 **Depends on:** Source evidence and compatibility gates; opportunistic
 
@@ -198,13 +236,13 @@ Phase identifiers map the seven source specs; they do not impose a new total ord
 
 **Status:** Pending; no implementation or completion implied
 
-**Source:** `specs/006-deferred-v1-and-parity/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+**Source:** `.planning/reference/006-deferred-v1-and-parity/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
 
 **Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
 
 ### Phase 14: Drive Security Verification
 
-**Goal:** Plan the scope recorded in specs/007-drive-security-verification/spec.md within the binding constitution and source acceptance contract.
+**Goal:** Plan the scope recorded in .planning/reference/007-drive-security-verification/spec.md within the binding constitution and source acceptance contract.
 
 **Depends on:** Phase 7 baseline; may run at any time
 
@@ -212,6 +250,6 @@ Phase identifiers map the seven source specs; they do not impose a new total ord
 
 **Status:** Pending; no implementation or completion implied
 
-**Source:** `specs/007-drive-security-verification/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
+**Source:** `.planning/reference/007-drive-security-verification/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
 
 **Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.

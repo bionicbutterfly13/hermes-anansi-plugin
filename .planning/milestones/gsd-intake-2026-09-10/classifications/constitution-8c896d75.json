@@ -1,12 +1,12 @@
 {
-  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/.specify/memory/constitution.md",
+  "source_path": ".planning/reference/CONSTITUTION.md",
   "type": "ADR",
   "confidence": "high",
   "manifest_override": true,
   "title": "Hermes Anansi Metacognition Plugin Constitution",
   "summary": "Ratified governance defines Anansi's fail-open, observational, anti-erasure, persistence, dependency, drive, verification, and amendment constraints.",
   "scope": ["Anansi plugin", "Hermes hooks", "appraisal", "user-flagged priorities", "SQLite state", "drive controls", "configuration", "release gates", "governance"],
-  "cross_refs": [".specify/templates/plan-template.md", ".specify/templates/spec-template.md", ".specify/templates/tasks-template.md"],
+  "cross_refs": [],
   "locked": false,
   "precedence": 0
 }

@@ -102,7 +102,7 @@ is seven commits ahead of `main`. It contains:
   with a visible overflow count, tighter goal matching and corrected zero-day
   stall wording.
 - Config-degradation telemetry and a default request for `gpt-4o-mini`.
-- A Spec Kit constitution and explicit backlog specifications.
+- A constitution and explicit backlog specifications.
 
 These changes are implemented on that branch, not shipped on `main`. The review
 also found that a locked upgrade can quarantine existing state and create an empty
@@ -125,8 +125,8 @@ ways to revise that representation as evidence changes:
 These are **planned capabilities, not current features**, and have no committed
 delivery dates. Current-host compatibility, meaningful live-model verification
 and substantiated security checks also remain outstanding. The detailed
-[backlog](https://github.com/bionicbutterfly13/hermes-anansi-plugin/blob/001-close-known-gaps/specs/BACKLOG.md)
-lives on the development branch.
+[backlog](.planning/reference/BACKLOG.md)
+is retained in the GSD reference material.
 
 ## Installation and configuration
 

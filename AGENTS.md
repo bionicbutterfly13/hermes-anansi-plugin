@@ -1,7 +1,7 @@
 # AGENTS.md — Hermes Anansi Metacognition Plugin
 
 > Your AI agent reads this file as a persistent system rule for every conversation in this repo.
-> This repository uses **GSD** for active planning and preserves Spec Kit source documents. This guide is kept live
+> This repository uses **GSD** for planning and keeps engineering reference material under `.planning/`. This guide is kept live
 > by the platform workflows. Do not delete it — update it using the provided workflows.
 
 ---
@@ -107,7 +107,7 @@ follow. The map should become territory.
 
 GSD is the active workflow. Read `.planning/PROJECT.md`, `.planning/STATE.md`
 and `.planning/ROADMAP.md` for current scope and status. Read the engineering
-constitution at `.specify/memory/constitution.md` before non-trivial work.
+constitution at `.planning/reference/CONSTITUTION.md` before non-trivial work.
 
 - Status: `$gsd-progress`.
 - Phase work: `$gsd-discuss-phase N` → `$gsd-plan-phase N` →
@@ -121,10 +121,11 @@ Do not execute imported features merely because this migration captured them.
 Commit only when explicitly requested. Publishing and upstream submission need
 explicit authorization; use a task-owned branch/worktree and preserve other work.
 
-Every implementation plan must check Constitution Principles I-VII. The GSD
-migration changes the workflow command sequence only. Source Spec Kit docs under
-`specs/` and `.specify/memory/` are immutable intake evidence, not a second live
-planning queue. Full source text and acceptance criteria are in `.planning/intel/`.
+Every implementation plan must check Constitution Principles I-VII in
+`.planning/reference/CONSTITUTION.md`. Engineering reference documents live under
+`.planning/reference/`; their historical task checkmarks do not establish current
+completion. Active execution plans live only under `.planning/phases/`.
+Extracted requirements and acceptance criteria are in `.planning/intel/`.
 Use the two precedence resolutions in `.planning/INGEST-CONFLICTS.md` when planning.
 
 ## Platform Context
@@ -140,14 +141,15 @@ Use the two precedence resolutions in `.planning/INGEST-CONFLICTS.md` when plann
 ## Current Phase
 
 **Milestone:** imported backlog reconciliation and verification.
-**Phase:** 8 - Close Known Gaps, pending implementation planning.
-**Status:** GSD intake validated; Phase 8 is ready for discussion/planning.
+**Phase:** 8 - Close Known Gaps, four plans independently verified.
+**Status:** Ready to execute; implementation has not started.
 **Last updated:** 2026-09-10.
 
 ## Project Structure
 
 - `.planning/`: active GSD plans, phase contexts, source-attributed intel and history.
-- `specs/`, `.specify/memory/`: preserved Spec Kit intake sources and engineering constitution.
+- `.planning/reference/CONSTITUTION.md`: binding engineering invariants and GSD quality gates.
+- `.planning/reference/`: imported engineering contracts and historical branch evidence.
 - `anansi/`: plugin source and tests.
 - `scripts/`: canonical test runner and live diagnostics.
 - `AGENTS.md`, `CLAUDE.md`: synchronized repository instructions.
@@ -221,6 +223,10 @@ Use Task Observer under the governing user instructions for reusable methodology
 
 <!-- Updated automatically by the debug workflow after each resolved session -->
 <!-- Add entries in reverse chronological order: ### YYYY-MM-DD: Short description -->
+
+### 2026-09-10: GSD planning status cache missed completed planning
+
+The migrated roadmap lacked the documented Progress table, so the cache enumerated no phases. Custom status prose was preserved by the planning transition, and a later state patch did not republish the cache. Canonical status fields and the Progress table restored the official `state.planned-phase` transition. Verify both the generated cache and the plan inventory after planning; command success alone does not establish correct routing.
 
 > GSD ingestion repair and migration evidence: `.planning/GSD-MIGRATION.md` and `CHANGELOG.md`. Original regression history is preserved in the pre-migration snapshot.
 

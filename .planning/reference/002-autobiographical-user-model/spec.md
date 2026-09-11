@@ -11,7 +11,7 @@ user model, worldview, user-dopamine" (`.planning/phases/06-.../06-CONTEXT.md:14
 for the later increments: **worldview store → episode/autobiography + user-dopamine → reconsolidation**
 (`06-CONTEXT.md:93-94`, `06-DISCUSSION-LOG.md:54-55`). Reconsolidation is a separate spec (003).
 
-This captures a designed-but-unbuilt direction. It MUST be re-scoped (`/speckit-clarify` → `/speckit-plan`)
+This captures a designed-but-unbuilt direction. It MUST be re-scoped (GSD phase discussion → planning)
 before implementation — Phase 6 left the internals to plan-phase.
 
 ## Governing constraints (constitution + Phase 6 locks)

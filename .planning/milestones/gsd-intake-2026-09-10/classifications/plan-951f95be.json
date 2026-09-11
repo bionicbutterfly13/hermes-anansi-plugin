@@ -1,12 +1,12 @@
 {
-  "source_path": "/Volumes/Asylum/repos/hermes-anansi-plugin-migrate-gsd/specs/001-close-known-gaps/plan.md",
+  "source_path": ".planning/reference/001-close-known-gaps/plan.md",
   "type": "SPEC",
   "confidence": "high",
   "manifest_override": true,
   "title": "Implementation Plan: Anansi Completion — Close Known Gaps",
   "summary": "Plans eight Anansi hardening slices covering goal pressure persistence, configuration, rendering, telemetry, migration, tests, and live verification within constitutional constraints.",
   "scope": ["goal pressure", "SQLite migration", "drive rendering", "configuration degradation", "telemetry", "live verification", "constitution check"],
-  "cross_refs": ["./spec.md", "specs/001-close-known-gaps/spec.md", "research.md", "data-model.md", "quickstart.md", "store-goals-schema.md", "config-keys.md", "telemetry-outcomes.md", "requirements.md", "tasks.md"],
+  "cross_refs": ["./spec.md", ".planning/reference/001-close-known-gaps/spec.md", "research.md", "data-model.md", "quickstart.md", "store-goals-schema.md", "config-keys.md", "telemetry-outcomes.md", "requirements.md", "tasks.md"],
   "locked": false,
   "precedence": null,
   "notes": ""

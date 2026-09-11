@@ -18,15 +18,16 @@ authorized by Dr. Mani. Use `$gsd-progress`, then the relevant GSD phase workflo
 `.planning/PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md` and `STATE.md` are the active
 planning surface. Phase contexts carry imported decisions and constraints.
 
-The 18 tracked Spec Kit documents remain unchanged under `specs/` and
-`.specify/memory/`. Their complete text is preserved in `.planning/intel/` with
-provenance. They are source inputs, not a second active task queue. Dr. Mani's GSD
-migration direction supersedes the Spec Kit command sequence in the original
-constitution's Development Workflow section, without amending Principles I-VII.
+The constitution lives at `.planning/reference/CONSTITUTION.md`; 17 imported engineering
+documents live under `.planning/reference/`. Their extracted content remains in
+`.planning/intel/`. Retired workflow commands and paths were normalized to GSD
+on 2026-09-10 at Dr. Mani's direction. Principles I-VII and acceptance criteria
+are preserved. Reference task lists describe historical branch work; only plans
+under `.planning/phases/` form the active execution queue.
 
 ## Binding Engineering Decisions
 
-Read `.specify/memory/constitution.md` before every non-trivial change.
+Read `.planning/reference/CONSTITUTION.md` before every non-trivial change.
 
 - Fail-open remains mandatory, including failures introduced by new paths.
 - Output remains observational: no directives, autonomous tools, memory-provider

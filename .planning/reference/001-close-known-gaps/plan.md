@@ -2,7 +2,7 @@
 
 **Branch**: `001-close-known-gaps` | **Date**: 2026-07-05 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `specs/001-close-known-gaps/spec.md`
+**Input**: Feature specification from `.planning/reference/001-close-known-gaps/spec.md`
 
 ## Summary
 
@@ -64,7 +64,7 @@ module-local doctrine.
 ### Documentation (this feature)
 
 ```text
-specs/001-close-known-gaps/
+.planning/reference/001-close-known-gaps/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 — decisions per gap (grounded in code)
 ├── data-model.md        # Phase 1 — Goal pressure columns, config keys, telemetry event
@@ -74,8 +74,8 @@ specs/001-close-known-gaps/
 │   ├── config-keys.md           # drive_pressure + flagged-want cap key contracts
 │   └── telemetry-outcomes.md    # config_degraded outcome contract
 ├── checklists/
-│   └── requirements.md  # (from /speckit-specify) — all green
-└── tasks.md             # Phase 2 — /speckit-tasks (NOT created here)
+│   └── requirements.md  # (source requirements checklist) — all green
+└── tasks.md             # historical branch task ledger
 ```
 
 ### Source Code (repository root)

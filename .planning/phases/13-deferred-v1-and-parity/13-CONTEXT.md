@@ -3,8 +3,8 @@
 Captured by the authorized GSD merge-mode intake on 2026-09-10.
 
 <domain>
-Plan the scope recorded in specs/006-deferred-v1-and-parity/spec.md within the binding constitution and source acceptance contract.
-Source: `specs/006-deferred-v1-and-parity/spec.md`.
+Plan the scope recorded in .planning/reference/006-deferred-v1-and-parity/spec.md within the binding constitution and source acceptance contract.
+Source: `.planning/reference/006-deferred-v1-and-parity/spec.md`.
 </domain>
 
 <decisions>

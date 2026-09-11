@@ -1,6 +1,6 @@
 # Requirements — Hermes Anansi Metacognition Plugin
 
-**GSD migration, 2026-09-10:** the checked v1 ledger records historical implementation evidence, not fresh runtime verification. Phase 6 explicitly superseded the blanket heartbeat/user-dopamine exclusion for bounded future work. Constitution engineering invariants remain binding. Current imported work is under GSD Intake Requirements below; none is marked complete by this migration. Source Spec Kit files and complete extracted acceptance contracts remain immutable provenance.
+**GSD migration, 2026-09-10:** the checked v1 ledger records historical implementation evidence, not fresh runtime verification. Phase 6 explicitly superseded the blanket heartbeat/user-dopamine exclusion for bounded future work. Constitution engineering invariants remain binding. Current imported work is under GSD Intake Requirements below; none is marked complete by this migration. Engineering references and extracted acceptance contracts are retained under `.planning/`, with retired workflow commands and paths normalized to GSD.
 
 
 v1 selection made 2026-06-10 during the autonomous ceremony (self-answered under Dr. Mani's
@@ -90,7 +90,7 @@ acceptance contract before planning; a checkbox summary is not its full contract
 
 ### 001: Close Known Gaps (Phase 8)
 
-Source: `specs/001-close-known-gaps/spec.md`.
+Source: `.planning/reference/001-close-known-gaps/spec.md`.
 
 - [ ] **REQ-001-close-known-gaps-fr-001**: Persist per-goal pressure metadata through the single SQLite store so it round-trips a read/write cycle.
 - [ ] **REQ-001-close-known-gaps-fr-002**: Migrate an existing goals table without data loss and without raising; goals lacking new fields read documented defaults.
@@ -109,7 +109,7 @@ Source: `specs/001-close-known-gaps/spec.md`.
 
 ### 002: Autobiographical User Model (Phase 9)
 
-Source: `specs/002-autobiographical-user-model/spec.md`.
+Source: `.planning/reference/002-autobiographical-user-model/spec.md`.
 
 - [ ] **REQ-002-autobiographical-user-model-fr-001**: Persist a worldview layer as typed, capped, decaying data on the single SQLite surface with supersession and contradiction edges.
 - [ ] **REQ-002-autobiographical-user-model-fr-002**: Persist an episode/autobiography layer with an autonoesis tag, typed, capped, and decaying on the single SQLite surface.
@@ -122,7 +122,7 @@ Source: `specs/002-autobiographical-user-model/spec.md`.
 
 ### 003: Reconsolidation and Heartbeat (Phase 10)
 
-Source: `specs/003-reconsolidation-and-heartbeat/spec.md`.
+Source: `.planning/reference/003-reconsolidation-and-heartbeat/spec.md`.
 
 - [ ] **REQ-003-reconsolidation-and-heartbeat-fr-001**: Provide a scheduled heartbeat with execution mechanism chosen at plan phase and in-turn-only degradation if unavailable.
 - [ ] **REQ-003-reconsolidation-and-heartbeat-fr-002**: Limit heartbeat to state preparation and next-real-turn surfacing; it must not interrupt, notify, or emit outbound communication.
@@ -134,7 +134,7 @@ Source: `specs/003-reconsolidation-and-heartbeat/spec.md`.
 
 ### 004: Interruption Lanes (Phase 11)
 
-Source: `specs/004-interruption-lanes/spec.md`.
+Source: `.planning/reference/004-interruption-lanes/spec.md`.
 
 **Deferred under constitution precedence.** Interruption/outreach exceptions are captured source variants, not approved implementation. A compliant scope decision is required before execution planning.
 
@@ -146,7 +146,7 @@ Source: `specs/004-interruption-lanes/spec.md`.
 
 ### 005: Tuning and Audit Surfaces (Phase 12)
 
-Source: `specs/005-tuning-and-audit-surfaces/spec.md`.
+Source: `.planning/reference/005-tuning-and-audit-surfaces/spec.md`.
 
 - [ ] **REQ-005-tuning-and-audit-surfaces-fr-001**: Let a desktop config panel edit cadence, per-heartbeat budgets, and domain whitelists; changes take effect on the next config read and malformed input emits config_degraded telemetry.
 - [ ] **REQ-005-tuning-and-audit-surfaces-fr-002**: Read persisted cross-session history on heartbeat and observationally surface a possible-under-support flag without false alarms when support is adequate.
@@ -155,7 +155,7 @@ Source: `specs/005-tuning-and-audit-surfaces/spec.md`.
 
 ### 006: Deferred v1 and Parity (Phase 13)
 
-Source: `specs/006-deferred-v1-and-parity/spec.md`.
+Source: `.planning/reference/006-deferred-v1-and-parity/spec.md`.
 
 - [ ] **REQ-006-deferred-v1-and-parity-fr-001**: Implement D5 salience filtering only after an upstream post_memory_prefetch-style hook exists; until then preserve a documented no-op.
 - [ ] **REQ-006-deferred-v1-and-parity-fr-002**: Re-verify and record upstream-main manifest, ctx.llm, pip_dependencies, and host-standard-suite parity.
@@ -166,7 +166,7 @@ Source: `specs/006-deferred-v1-and-parity/spec.md`.
 
 ### 007: Drive Security Verification (Phase 14)
 
-Source: `specs/007-drive-security-verification/spec.md`.
+Source: `.planning/reference/007-drive-security-verification/spec.md`.
 
 - [ ] **REQ-007-drive-security-verification-fr-001**: Produce a drive-layer security document with a STRIDE register and mitigation trace for goal-text rendering, ground-truth reads, configuration, and first-person voice carve-out.
 - [ ] **REQ-007-drive-security-verification-fr-002**: Run live Criterion-1 smoke against a provider and record PASS or honest INCONCLUSIVE reason; close spec-001 task T029 only on PASS.

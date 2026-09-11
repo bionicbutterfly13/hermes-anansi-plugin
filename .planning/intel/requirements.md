@@ -1,282 +1,282 @@
 ## REQ-001-close-known-gaps-fr-001
-- source: specs/001-close-known-gaps/spec.md:202-203
+- source: .planning/reference/001-close-known-gaps/spec.md:202-203
 - description: Persist per-goal pressure metadata through the single SQLite store so it round-trips a read/write cycle.
 - acceptance: Given a goal minted with support_style=firm, push_when_stalled=true, stall_threshold_days=3, when persisted and read in a new snapshot, all three values are present and unchanged; given a persisted firm-pressure goal stalled past threshold, the under-support/push read reflects persisted pressure; given locked or corrupt state DB during pressure read, appraisal silently degrades to empty injection plus telemetry row.
 - scope: per-goal pressure
 
 ## REQ-001-close-known-gaps-fr-002
-- source: specs/001-close-known-gaps/spec.md:204-205
+- source: .planning/reference/001-close-known-gaps/spec.md:204-205
 - description: Migrate an existing goals table without data loss and without raising; goals lacking new fields read documented defaults.
 - acceptance: Given an existing populated goals table without new columns, it upgrades without data loss and without raising; goals predating columns read documented defaults; locked or corrupt DB during a new read/write degrades silently to empty injection plus telemetry.
 - scope: goals migration
 
 ## REQ-001-close-known-gaps-fr-003
-- source: specs/001-close-known-gaps/spec.md:206-207
+- source: .planning/reference/001-close-known-gaps/spec.md:206-207
 - description: Read global drive_pressure and apply it to drive rendering, with invalid values coerced to the documented default.
 - acceptance: Given drive_pressure=quiet, drive lines render at quiet level, distinct from standard/firm on the same goals; given malformed drive_pressure, config coerces to documented default and get_cfg does not raise.
 - scope: global drive pressure
 
 ## REQ-001-close-known-gaps-fr-004
-- source: specs/001-close-known-gaps/spec.md:208-209
+- source: .planning/reference/001-close-known-gaps/spec.md:208-209
 - description: Emit a legible telemetry row whenever a config value is coerced away from the user-supplied value.
 - acceptance: Given a malformed known-key value, config coercion emits a telemetry row naming key, rejected input, and applied default; given secret-like value, rejected value is redacted and never quoted verbatim; given valid config, no degradation telemetry emits.
 - scope: configuration degradation telemetry
 
 ## REQ-001-close-known-gaps-fr-005
-- source: specs/001-close-known-gaps/spec.md:210-211
+- source: .planning/reference/001-close-known-gaps/spec.md:210-211
 - description: Redact secret-like config values in degradation telemetry and never raise or block the turn if telemetry storage is unavailable.
 - acceptance: Given secret-like config value, degradation telemetry redacts the rejected value and never quotes it verbatim; given locked telemetry store, degradation-row emission fails open and never raises or blocks the turn.
 - scope: configuration degradation telemetry
 
 ## REQ-001-close-known-gaps-fr-006
-- source: specs/001-close-known-gaps/spec.md:212-214
+- source: .planning/reference/001-close-known-gaps/spec.md:212-214
 - description: Bound rendered flagged wants with a proportionate cap while guaranteeing the highest-priority flagged wants render and visibly indicating withheld wants.
 - acceptance: Given more flagged wants than cap, highest-priority flagged wants render and a visible marker gives N additional withheld wants; given wants at or under cap, all render with no marker; existing adversarial-crowding never-omit test still passes.
 - scope: flagged wants
 
 ## REQ-001-close-known-gaps-fr-007
-- source: specs/001-close-known-gaps/spec.md:215-216
+- source: .planning/reference/001-close-known-gaps/spec.md:215-216
 - description: Keep the never-omit invariant under the cap, verified against persisted state rather than model output.
 - acceptance: Given more flagged wants than cap, highest-priority flagged wants render and a visible withheld count marks others; existing never-omit adversarial-crowding test still passes so a flagged priority is never silently absent.
 - scope: flagged wants
 
 ## REQ-001-close-known-gaps-fr-008
-- source: specs/001-close-known-gaps/spec.md:217-218
+- source: .planning/reference/001-close-known-gaps/spec.md:217-218
 - description: Avoid false-positive goal-to-signal associations caused by loose substring matching while preserving legitimate associations.
 - acceptance: Given a goal key that is substring of an unrelated token, matching creates no spurious association; given a goal legitimately corresponding to a signal, association remains.
 - scope: goal-to-signal matching
 
 ## REQ-001-close-known-gaps-fr-009
-- source: specs/001-close-known-gaps/spec.md:219-220
+- source: .planning/reference/001-close-known-gaps/spec.md:219-220
 - description: Handle stalled_days=0 with a well-formed fresh/active read distinct from stalled rendering and an empty line.
 - acceptance: Given a goal with stalled_days=0, drive-want line renders a well-formed fresh/active read, not stalled and not blank.
 - scope: fresh-goal rendering
 
 ## REQ-001-close-known-gaps-fr-010
-- source: specs/001-close-known-gaps/spec.md:221-223
+- source: .planning/reference/001-close-known-gaps/spec.md:221-223
 - description: Provide a documented single-command live-smoke lane for first-person owned-want voice and report an honest environment-gated outcome when no provider is reachable.
 - acceptance: Given reachable model provider and persisted flagged goal, live drive smoke surfaces goal in first-person owned-want voice; given no reachable provider, live smoke reports honest environment-gated outcome and documented re-run lane remains ready.
 - scope: live smoke verification
 
 ## REQ-001-close-known-gaps-fr-011
-- source: specs/001-close-known-gaps/spec.md:224-225
+- source: .planning/reference/001-close-known-gaps/spec.md:224-225
 - description: Rename master kill switch terminology in tests/comments to primary/main with no runtime behavior change.
 - acceptance: Given renamed term, suite passes and no behavioral test assertion changes.
 - scope: kill-switch terminology
 
 ## REQ-001-close-known-gaps-fr-012
-- source: specs/001-close-known-gaps/spec.md:226-227
+- source: .planning/reference/001-close-known-gaps/spec.md:226-227
 - description: Hold all constitution principles; keep full fail-open matrix and never-omit tests green without weakening a principle.
 - acceptance: Full ./scripts/test.sh suite is green, including fail-open matrix and never-omit tests, with no assertion weakened relative to pre-change suite.
 - scope: constitution compliance
 
 ## REQ-002-autobiographical-user-model-fr-001
-- source: specs/002-autobiographical-user-model/spec.md:107-108
+- source: .planning/reference/002-autobiographical-user-model/spec.md:107-108
 - description: Persist a worldview layer as typed, capped, decaying data on the single SQLite surface with supersession and contradiction edges.
 - acceptance: Given a persisted worldview belief, a contradicting turn surfaces an observational worldview/contradiction note and never a second-person imperative; given a belief with supersession/contradiction edge, edge and belief round-trip intact; given locked/corrupt DB during worldview read, turn silently degrades to empty injection plus telemetry and never raises.
 - scope: worldview store
 
 ## REQ-002-autobiographical-user-model-fr-002
-- source: specs/002-autobiographical-user-model/spec.md:109-110
+- source: .planning/reference/002-autobiographical-user-model/spec.md:109-110
 - description: Persist an episode/autobiography layer with an autonoesis tag, typed, capped, and decaying on the single SQLite surface.
 - acceptance: Given a persisted episode, a related turn may surface an observational note grounded in it with no directive; given five model layers, schema defines each as typed, capped, decaying table on the single SQLite surface.
 - scope: autobiographical episodes
 
 ## REQ-002-autobiographical-user-model-fr-003
-- source: specs/002-autobiographical-user-model/spec.md:111-112
+- source: .planning/reference/002-autobiographical-user-model/spec.md:111-112
 - description: Model the user's habit/motivation dynamics within whitelisted domains, override-able and never as an agent-reward signal.
 - acceptance: Given user-dopamine model in whitelisted domain, appraisal may raise goal salience/ordering as inspectable drive effect, never agent-reward signal or truth/evidence change; given non-whitelisted domain it contributes nothing; given user override, next turn honors it.
 - scope: user-dopamine
 
 ## REQ-002-autobiographical-user-model-fr-004
-- source: specs/002-autobiographical-user-model/spec.md:113-114
+- source: .planning/reference/002-autobiographical-user-model/spec.md:113-114
 - description: Surface all new layers only as observational appraisal notes with no directives or second-person imperatives.
 - acceptance: Given a persisted worldview belief contradicted by a turn, appraisal surfaces an observational note, never second-person imperative; given a persisted episode and related turn, appraisal may surface observational note with no directive.
 - scope: appraisal output
 
 ## REQ-002-autobiographical-user-model-fr-005
-- source: specs/002-autobiographical-user-model/spec.md:115-116
+- source: .planning/reference/002-autobiographical-user-model/spec.md:115-116
 - description: Make any salience or ordering effect inspectable as a drive effect separate from the neutral read.
 - acceptance: Given user-dopamine model in whitelisted domain, appraisal may raise goal salience/ordering as an inspectable drive effect, never altering truth or evidence.
 - scope: drive effects
 
 ## REQ-002-autobiographical-user-model-fr-006
-- source: specs/002-autobiographical-user-model/spec.md:117-118
+- source: .planning/reference/002-autobiographical-user-model/spec.md:117-118
 - description: Read freshness-critical signals at appraisal-read time from ground truth rather than through reflection debounce.
 - acceptance: absent
 - scope: freshness-critical signals
 
 ## REQ-002-autobiographical-user-model-fr-007
-- source: specs/002-autobiographical-user-model/spec.md:119-120
+- source: .planning/reference/002-autobiographical-user-model/spec.md:119-120
 - description: Apply caps, decay, and pruning to all new tables; locked/corrupt databases silently degrade; use no path literals or new dependencies.
 - acceptance: Given locked/corrupt DB during worldview read, turn silently degrades to empty injection plus telemetry and never raises; locked/corrupt DB during any new-layer read/write silently degrades.
 - scope: state tables
 
 ## REQ-002-autobiographical-user-model-fr-008
-- source: specs/002-autobiographical-user-model/spec.md:121-122
+- source: .planning/reference/002-autobiographical-user-model/spec.md:121-122
 - description: Give each layer a documented containment toggle so a user can turn it off.
 - acceptance: absent
 - scope: layer containment
 
 ## REQ-003-reconsolidation-and-heartbeat-fr-001
-- source: specs/003-reconsolidation-and-heartbeat/spec.md:80-81
+- source: .planning/reference/003-reconsolidation-and-heartbeat/spec.md:80-81
 - description: Provide a scheduled heartbeat with execution mechanism chosen at plan phase and in-turn-only degradation if unavailable.
 - acceptance: Given heartbeat fires between sessions, next user turn surfaces prepped context in-turn; given any heartbeat failure, it never raises, blocks, or emits outbound message; given unavailable heartbeat mechanism, degrade to in-turn-only behavior and never error.
 - scope: scheduled heartbeat
 
 ## REQ-003-reconsolidation-and-heartbeat-fr-002
-- source: specs/003-reconsolidation-and-heartbeat/spec.md:82-83
+- source: .planning/reference/003-reconsolidation-and-heartbeat/spec.md:82-83
 - description: Limit heartbeat to state preparation and next-real-turn surfacing; it must not interrupt, notify, or emit outbound communication.
 - acceptance: Given heartbeat fires between sessions, next user turn surfaces prepped context in-turn; given failure, it never raises, blocks, or emits outbound message; given drive/heartbeat switch off, it does nothing.
 - scope: next-turn context
 
 ## REQ-003-reconsolidation-and-heartbeat-fr-003
-- source: specs/003-reconsolidation-and-heartbeat/spec.md:84-85
+- source: .planning/reference/003-reconsolidation-and-heartbeat/spec.md:84-85
 - description: Make heartbeat debounced and idempotent so double firing is a no-op.
 - acceptance: Given heartbeat fires twice, comparison shows second firing is a no-op, idempotent and watermarked.
 - scope: heartbeat idempotency
 
 ## REQ-003-reconsolidation-and-heartbeat-fr-004
-- source: specs/003-reconsolidation-and-heartbeat/spec.md:86-87
+- source: .planning/reference/003-reconsolidation-and-heartbeat/spec.md:86-87
 - description: Carry a per-heartbeat energy/attention budget with a hard cap per wakeup.
 - acceptance: Per-heartbeat energy budget hard-caps costed actions; exceeding cap withholds work visibly rather than silently.
 - scope: energy budget
 
 ## REQ-003-reconsolidation-and-heartbeat-fr-005
-- source: specs/003-reconsolidation-and-heartbeat/spec.md:88-89
+- source: .planning/reference/003-reconsolidation-and-heartbeat/spec.md:88-89
 - description: Propagate belief flips across dependent memories, goals, episodes, and worldview edges on the single SQLite surface, idempotently on heartbeat.
 - acceptance: Given worldview belief flips, heartbeat re-evaluates items depending on old belief and persists propagation; given propagation interrupted mid-process, resumption is idempotent with no double-application.
 - scope: reconsolidation
 
 ## REQ-003-reconsolidation-and-heartbeat-fr-006
-- source: specs/003-reconsolidation-and-heartbeat/spec.md:90-91
+- source: .planning/reference/003-reconsolidation-and-heartbeat/spec.md:90-91
 - description: Surface reconsolidation output observationally in-turn, never as a directive or silent omission of a user-flagged priority.
 - acceptance: Given reconsolidation result touches user-flagged priority, next-turn surfacing never silently drops that priority.
 - scope: reconsolidation output
 
 ## REQ-003-reconsolidation-and-heartbeat-fr-007
-- source: specs/003-reconsolidation-and-heartbeat/spec.md:92-93
+- source: .planning/reference/003-reconsolidation-and-heartbeat/spec.md:92-93
 - description: Provide a separate heartbeat/drive kill switch and retain fail-open, zero-dependency, and config-path constraints.
 - acceptance: Given any heartbeat failure, it never raises, blocks, or emits outbound message; given drive/heartbeat kill switch off, it does nothing.
 - scope: heartbeat containment
 
 ## REQ-004-interruption-lanes-fr-001
-- source: specs/004-interruption-lanes/spec.md:73-74
+- source: .planning/reference/004-interruption-lanes/spec.md:73-74
 - description: Allow code-red only for objective user-defined conditions attached to user-flagged goals; the agent cannot self-declare urgency.
 - acceptance: Given objective user-defined trigger on user-flagged goal, lane may interrupt on gentlest channel within hard rate limit; given only agent urgency assessment, lane cannot interrupt; given switch off or non-whitelisted domain, lane never fires; repeated triggers over rate limit are throttled.
 - scope: code-red interruption lane
 
 ## REQ-004-interruption-lanes-fr-002
-- source: specs/004-interruption-lanes/spec.md:75-76
+- source: .planning/reference/004-interruption-lanes/spec.md:75-76
 - description: Keep code-red off by default and opt-in with a separate interrupt kill switch, domain whitelist, and hard rate limit on the gentlest channel.
 - acceptance: Given objective user-defined trigger on user-flagged goal, lane may interrupt only within hard rate limit; given switch off or domain not whitelisted, lane never fires; repeated triggers exceeding rate limit are throttled.
 - scope: code-red interruption lane
 
 ## REQ-004-interruption-lanes-fr-003
-- source: specs/004-interruption-lanes/spec.md:77-78
+- source: .planning/reference/004-interruption-lanes/spec.md:77-78
 - description: Keep proactive-notify L2 off by default and opt-in, gated on a verified desktop cold-respawn fix.
 - acceptance: Given verified desktop cold-respawn fix and L2 opt-in, heartbeat may deliver surfaceable item on gentlest channel; given fix absent or L2 not opted-in, no proactive notification emits.
 - scope: proactive notification L2
 
 ## REQ-004-interruption-lanes-fr-004
-- source: specs/004-interruption-lanes/spec.md:79-80
+- source: .planning/reference/004-interruption-lanes/spec.md:79-80
 - description: Emit from neither lane unless preconditions hold; both fail open and do not violate no-outreach when disabled.
 - acceptance: Given switch off or non-whitelisted domain, lane never fires; given L2 defect unfixed or not opted-in, no proactive notification emits; unavailable channel degrades to next-turn surfacing without error or item loss; rate-limit withholding records and never spams.
 - scope: interruption lanes
 
 ## REQ-004-interruption-lanes-fr-005
-- source: specs/004-interruption-lanes/spec.md:81-82
+- source: .planning/reference/004-interruption-lanes/spec.md:81-82
 - description: Make every interruption auditable by trigger, channel, and rate budget.
 - acceptance: Code-red fires in 0% of cases without met user-defined trigger and every fire is attributable to one; lanes are off by default and each fire respects kill switch, whitelist, and rate limit.
 - scope: interrupt audit records
 
 ## REQ-005-tuning-and-audit-surfaces-fr-001
-- source: specs/005-tuning-and-audit-surfaces/spec.md:88-90
+- source: .planning/reference/005-tuning-and-audit-surfaces/spec.md:88-90
 - description: Let a desktop config panel edit cadence, per-heartbeat budgets, and domain whitelists; changes take effect on the next config read and malformed input emits config_degraded telemetry.
 - acceptance: Given panel changes per-heartbeat energy budget, next heartbeat uses new budget; given panel changes domain whitelist, next turn surfaces drive signals only from new whitelist; given malformed panel input, config coerces to documented default, emits config_degraded, and never raises.
 - scope: desktop configuration panel
 
 ## REQ-005-tuning-and-audit-surfaces-fr-002
-- source: specs/005-tuning-and-audit-surfaces/spec.md:91-92
+- source: .planning/reference/005-tuning-and-audit-surfaces/spec.md:91-92
 - description: Read persisted cross-session history on heartbeat and observationally surface a possible-under-support flag without false alarms when support is adequate.
 - acceptance: Given N sessions of low-pressure handling of stalled push_when_stalled goal, heartbeat audit surfaces possible-under-support flag observationally next turn; given adequate support, audit raises no flag.
 - scope: under-response audit
 
 ## REQ-005-tuning-and-audit-surfaces-fr-003
-- source: specs/005-tuning-and-audit-surfaces/spec.md:93-94
+- source: .planning/reference/005-tuning-and-audit-surfaces/spec.md:93-94
 - description: Persist would-have-said items and surface them only in the next turn's appraisal, never outbound; cap and prune them.
 - acceptance: Given would-have-said item, next turn shows it in appraisal block and never outbound; given empty outbox, nothing surfaces.
 - scope: passive outbox
 
 ## REQ-005-tuning-and-audit-surfaces-fr-004
-- source: specs/005-tuning-and-audit-surfaces/spec.md:95-96
+- source: .planning/reference/005-tuning-and-audit-surfaces/spec.md:95-96
 - description: Keep all three surfaces fail-open, zero-dependency, config-path based, and unable to self-modify prompts or thresholds.
 - acceptance: Fail-open, never-omit, and no-outreach tests are green with no new dependencies.
 - scope: tuning and audit surfaces
 
 ## REQ-006-deferred-v1-and-parity-fr-001
-- source: specs/006-deferred-v1-and-parity/spec.md:96-97
+- source: .planning/reference/006-deferred-v1-and-parity/spec.md:96-97
 - description: Implement D5 salience filtering only after an upstream post_memory_prefetch-style hook exists; until then preserve a documented no-op.
 - acceptance: Given upstream post_memory_prefetch hook, Anansi can re-rank injected memory observationally without dropping user-flagged items; given no hook, D5 does nothing and is documented pending-upstream with no error or false claim.
 - scope: memory salience filtering
 
 ## REQ-006-deferred-v1-and-parity-fr-002
-- source: specs/006-deferred-v1-and-parity/spec.md:98-99
+- source: .planning/reference/006-deferred-v1-and-parity/spec.md:98-99
 - description: Re-verify and record upstream-main manifest, ctx.llm, pip_dependencies, and host-standard-suite parity.
 - acceptance: Given current upstream main, plugin load accepts manifest hook key and ctx.llm resolves or documented fallback is taken, with result recorded; given current upstream main, host-standard suite pass/fail is recorded.
 - scope: upstream host parity
 
 ## REQ-006-deferred-v1-and-parity-fr-003
-- source: specs/006-deferred-v1-and-parity/spec.md:100-101
+- source: .planning/reference/006-deferred-v1-and-parity/spec.md:100-101
 - description: Deepen dimensional affect and active-concern continuity without output-tone modulation or exceeding state caps.
 - acceptance: Given affect telemetry, D3 depth displays valence/arousal decay-to-baseline as inspectable state and never modulates output tone; given concern history, D6 tuning decays/prunes stale concerns on validated policy.
 - scope: dimensional affect and active-concern continuity
 
 ## REQ-006-deferred-v1-and-parity-fr-004
-- source: specs/006-deferred-v1-and-parity/spec.md:102
+- source: .planning/reference/006-deferred-v1-and-parity/spec.md:102
 - description: Add a WAL-on-network-mount startup check or documented caveat.
 - acceptance: Given HERMES_HOME network mount, store initialization warns or documented caveat exists so WAL corruption risk is not silent.
 - scope: SQLite WAL and network mounts
 
 ## REQ-006-deferred-v1-and-parity-fr-005
-- source: specs/006-deferred-v1-and-parity/spec.md:103
+- source: .planning/reference/006-deferred-v1-and-parity/spec.md:103
 - description: Decide and record auxiliary-model routing through ctx.register_auxiliary_task or the bespoke config key.
 - acceptance: Given host ctx.register_auxiliary_task, routing evaluation records a decision to adopt it or retain bespoke config key.
 - scope: auxiliary-model routing
 
 ## REQ-006-deferred-v1-and-parity-fr-006
-- source: specs/006-deferred-v1-and-parity/spec.md:104
+- source: .planning/reference/006-deferred-v1-and-parity/spec.md:104
 - description: Keep all work fail-open, zero-dependency, and config-path based.
 - acceptance: D5 either works through real host hook or is documented tested no-op; upstream parity is recorded; D3/D6 stay inside state caps with no output-tone modulation; network-mount guard and auxiliary-model routing decision exist.
 - scope: deferred v1 and parity
 
 ## REQ-007-drive-security-verification-fr-001
-- source: specs/007-drive-security-verification/spec.md:82-84
+- source: .planning/reference/007-drive-security-verification/spec.md:82-84
 - description: Produce a drive-layer security document with a STRIDE register and mitigation trace for goal-text rendering, ground-truth reads, configuration, and first-person voice carve-out.
 - acceptance: Given drive inputs, threat register has each STRIDE category with mitigation traced to code/tests; given never-omit, SAFE-04, and anti-creep invariants, document confirms enforcement and tests or flags gap.
 - scope: drive security
 
 ## REQ-007-drive-security-verification-fr-002
-- source: specs/007-drive-security-verification/spec.md:85-86
+- source: .planning/reference/007-drive-security-verification/spec.md:85-86
 - description: Run live Criterion-1 smoke against a provider and record PASS or honest INCONCLUSIVE reason; close spec-001 task T029 only on PASS.
 - acceptance: Given reachable provider, live drive smoke exits 0 with first-person want line; given no provider, it exits 2 INCONCLUSIVE honestly and never false-passes.
 - scope: live drive verification
 
 ## REQ-007-drive-security-verification-fr-003
-- source: specs/007-drive-security-verification/spec.md:87-88
+- source: .planning/reference/007-drive-security-verification/spec.md:87-88
 - description: Verify APPR-06 trust fallback live on a fast-enough host or record accepted deferral with reason; do not claim verification without evidence.
 - acceptance: Given fast-enough host model and trust-gate denial, telemetry records completed trust_fallback retry; given slow host model, fallback exceeding deadline degrades to fail-open timeout and is recorded rather than treated as bug.
 - scope: trust-gate fallback
 
 ## REQ-007-drive-security-verification-fr-004
-- source: specs/007-drive-security-verification/spec.md:89-90
+- source: .planning/reference/007-drive-security-verification/spec.md:89-90
 - description: Make no code change for FR-002 or FR-003 unless a defect is found; the existing harnesses report honest exit codes.
 - acceptance: 07-SECURITY.md exists with mitigations traced to code/tests; live drive outcome is recorded and closes Phase-7 Criterion 1 and T029 only on PASS; APPR-06 is live-produced or accepted-deferred with concrete reason.
 - scope: verification debt
 
 
 ## REQ-001-close-known-gaps-acceptance-contract
-- source: specs/001-close-known-gaps/spec.md:1-269
+- source: .planning/reference/001-close-known-gaps/spec.md:1-269
 - description: Full source feature contract, preserving feature status, governing constraints, user scenarios and testing, acceptance scenarios, edge cases, functional requirements, success criteria, assumptions, dependencies, and out-of-scope qualifiers.
 - acceptance:
 ````text
@@ -555,7 +555,7 @@ DATA_L2N4P6R8_END
 - scope: per-goal pressure; global drive pressure; configuration degradation telemetry; flagged wants; goal-to-signal matching; freshly-touched rendering; live smoke verification; kill-switch terminology; constitution compliance; success criteria: 001-close-known-gaps-SC-001, 001-close-known-gaps-SC-002, 001-close-known-gaps-SC-003, 001-close-known-gaps-SC-004, 001-close-known-gaps-SC-005, 001-close-known-gaps-SC-006
 
 ## REQ-002-autobiographical-user-model-acceptance-contract
-- source: specs/002-autobiographical-user-model/spec.md:1-148
+- source: .planning/reference/002-autobiographical-user-model/spec.md:1-148
 - description: Full source feature contract, preserving feature status, governing constraints, user scenarios and testing, acceptance scenarios, edge cases, functional requirements, success criteria, assumptions, dependencies, and out-of-scope qualifiers.
 - acceptance:
 ````text
@@ -573,7 +573,7 @@ user model, worldview, user-dopamine" (`.planning/phases/06-.../06-CONTEXT.md:14
 for the later increments: **worldview store → episode/autobiography + user-dopamine → reconsolidation**
 (`06-CONTEXT.md:93-94`, `06-DISCUSSION-LOG.md:54-55`). Reconsolidation is a separate spec (003).
 
-This captures a designed-but-unbuilt direction. It MUST be re-scoped (`/speckit-clarify` → `/speckit-plan`)
+This captures a designed-but-unbuilt direction. It MUST be re-scoped (GSD phase discussion → planning)
 before implementation — Phase 6 left the internals to plan-phase.
 
 ## Governing constraints (constitution + Phase 6 locks)
@@ -713,7 +713,7 @@ DATA_M3O5Q7S9_END
 - scope: worldview store; autobiographical episodes; user-dopamine; drive effects; layer containment; success criteria: 002-autobiographical-user-model-SC-001, 002-autobiographical-user-model-SC-002, 002-autobiographical-user-model-SC-003, 002-autobiographical-user-model-SC-004
 
 ## REQ-003-reconsolidation-and-heartbeat-acceptance-contract
-- source: specs/003-reconsolidation-and-heartbeat/spec.md:1-115
+- source: .planning/reference/003-reconsolidation-and-heartbeat/spec.md:1-115
 - description: Full source feature contract, preserving feature status, governing constraints, user scenarios and testing, acceptance scenarios, edge cases, functional requirements, success criteria, assumptions, dependencies, and out-of-scope qualifiers.
 - acceptance:
 ````text
@@ -838,7 +838,7 @@ DATA_N4P6R8T0_END
 - scope: scheduled heartbeat; reconsolidation; energy budget; idempotency; next-turn context; success criteria: 003-reconsolidation-and-heartbeat-SC-001, 003-reconsolidation-and-heartbeat-SC-002, 003-reconsolidation-and-heartbeat-SC-003, 003-reconsolidation-and-heartbeat-SC-004
 
 ## REQ-004-interruption-lanes-acceptance-contract
-- source: specs/004-interruption-lanes/spec.md:1-104
+- source: .planning/reference/004-interruption-lanes/spec.md:1-104
 - description: Full source feature contract, preserving feature status, governing constraints, user scenarios and testing, acceptance scenarios, edge cases, functional requirements, success criteria, assumptions, dependencies, and out-of-scope qualifiers.
 - acceptance:
 ````text
@@ -952,7 +952,7 @@ DATA_O5Q7S9U1_END
 - scope: code-red interruption lane; proactive notification L2; user-defined triggers; containment; audit records; success criteria: 004-interruption-lanes-SC-001, 004-interruption-lanes-SC-002, 004-interruption-lanes-SC-003, 004-interruption-lanes-SC-004
 
 ## REQ-005-tuning-and-audit-surfaces-acceptance-contract
-- source: specs/005-tuning-and-audit-surfaces/spec.md:1-116
+- source: .planning/reference/005-tuning-and-audit-surfaces/spec.md:1-116
 - description: Full source feature contract, preserving feature status, governing constraints, user scenarios and testing, acceptance scenarios, edge cases, functional requirements, success criteria, assumptions, dependencies, and out-of-scope qualifiers.
 - acceptance:
 ````text
@@ -1078,7 +1078,7 @@ DATA_P6R8T0V2_END
 - scope: desktop configuration panel; under-response audit; passive outbox; success criteria: 005-tuning-and-audit-surfaces-SC-001, 005-tuning-and-audit-surfaces-SC-002, 005-tuning-and-audit-surfaces-SC-003, 005-tuning-and-audit-surfaces-SC-004
 
 ## REQ-006-deferred-v1-and-parity-acceptance-contract
-- source: specs/006-deferred-v1-and-parity/spec.md:1-119
+- source: .planning/reference/006-deferred-v1-and-parity/spec.md:1-119
 - description: Full source feature contract, preserving feature status, governing constraints, user scenarios and testing, acceptance scenarios, edge cases, functional requirements, success criteria, assumptions, dependencies, and out-of-scope qualifiers.
 - acceptance:
 ````text
@@ -1207,7 +1207,7 @@ DATA_Q7S9U1W3_END
 - scope: memory salience filtering; upstream parity; dimensional affect; active concerns; WAL; auxiliary-model routing; success criteria: 006-deferred-v1-and-parity-SC-001, 006-deferred-v1-and-parity-SC-002, 006-deferred-v1-and-parity-SC-003, 006-deferred-v1-and-parity-SC-004
 
 ## REQ-007-drive-security-verification-acceptance-contract
-- source: specs/007-drive-security-verification/spec.md:1-105
+- source: .planning/reference/007-drive-security-verification/spec.md:1-105
 - description: Full source feature contract, preserving feature status, governing constraints, user scenarios and testing, acceptance scenarios, edge cases, functional requirements, success criteria, assumptions, dependencies, and out-of-scope qualifiers.
 - acceptance:
 ````text

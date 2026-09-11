@@ -1,11 +1,11 @@
 ## Anansi — Remaining Promise Backlog (spec index)
-- source: specs/BACKLOG.md
+- source: .planning/reference/BACKLOG.md
 - content:
 ````text
 DATA_G7I9K1M3_START
 # Anansi — Remaining Promise Backlog (spec index)
 
-Every promised-but-unbuilt or unverified item for the anansi plugin, captured as Spec Kit specs so
+Every promised-but-unbuilt or unverified item for the anansi plugin, captured as legacy planning specs so
 nothing is lost. Sourced from the `.planning/` archive (Phase 6 design, Phase 7 verification/UAT/learnings,
 DECISIONS, HANDOFF, ROADMAP, research/) and cross-checked against `anansi/` code on 2026-07-05.
 
@@ -42,12 +42,12 @@ after, each gated on its own precondition.
 - `.planning/research/DESIGN-REWIND-2026-06-10.md`
 - `.planning/research/USER-MODEL-SOURCES-2026-06-10.md`
 - `.planning/research/MEMORY-STACK-ANALYSIS-2026-06-10.md`
-- `.specify/memory/constitution.md` (governs all of the above)
+- `.planning/reference/CONSTITUTION.md` (governs all of the above)
 DATA_G7I9K1M3_END
 ````
 
 ## Quickstart — Validate the Gap Closure
-- source: specs/001-close-known-gaps/quickstart.md
+- source: .planning/reference/001-close-known-gaps/quickstart.md
 - content:
 ````text
 DATA_H8J0L2N4_START
@@ -97,7 +97,7 @@ DATA_H8J0L2N4_END
 ````
 
 ## Specification Quality Checklist: Anansi Completion — Close Known Gaps
-- source: specs/001-close-known-gaps/checklists/requirements.md
+- source: .planning/reference/001-close-known-gaps/checklists/requirements.md
 - content:
 ````text
 DATA_I9K1M3O5_START
@@ -143,12 +143,12 @@ DATA_I9K1M3O5_START
   (green suite, unweakened assertions) is the measurable target, not the tool.
 - No [NEEDS CLARIFICATION] markers: the eight gaps (G1–G8) were sourced directly from the phase-7
   verification, UAT, and review artifacts, so scope is fully determined.
-- Ready for `/speckit-plan` (or `/speckit-clarify` if deeper de-risking is wanted first).
+- Source checklist complete; active planning and clarification use the GSD phase workflows.
 DATA_I9K1M3O5_END
 ````
 
 ## Phase 0 Research — Close Known Gaps
-- source: specs/001-close-known-gaps/research.md
+- source: .planning/reference/001-close-known-gaps/research.md
 - content:
 ````text
 DATA_J0L2N4P6_START
@@ -300,7 +300,7 @@ DATA_J0L2N4P6_END
 ````
 
 ## Tasks: Anansi Completion — Close Known Gaps
-- source: specs/001-close-known-gaps/tasks.md
+- source: .planning/reference/001-close-known-gaps/tasks.md
 - content:
 ````text
 DATA_K1M3O5Q7_START
@@ -310,9 +310,9 @@ description: "Task list for Anansi Completion — Close Known Gaps"
 
 # Tasks: Anansi Completion — Close Known Gaps
 
-**Input**: Design documents from `specs/001-close-known-gaps/`
+**Input**: Design documents from `.planning/reference/001-close-known-gaps/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/, quickstart.md,
-`.specify/memory/constitution.md`
+`.planning/reference/CONSTITUTION.md`
 
 **Tests**: INCLUDED — the spec requires each vertical to ship code + tests, and the constitution makes the
 fail-open matrix + never-omit tests release gates.
@@ -421,7 +421,7 @@ top present + marker; ≤cap → all present, no marker.
 **Goal**: documented one-command lane + honest gated outcome; run when a provider is reachable.
 **Independent test**: the command reports PASS/FAIL/INCONCLUSIVE honestly.
 
-- [x] T028 [P] [US7] Document the live-smoke closure lane in `specs/001-close-known-gaps/quickstart.md` (already drafted) and in the plugin README: exact command `$HERMES_HOME/hermes-agent/venv/bin/python scripts/live_drive_smoke.py`, env gate (HERMES_HOME, api.anthropic.com:443, host creds), exit codes 0/1/2. No harness code change.
+- [x] T028 [P] [US7] Document the live-smoke closure lane in `.planning/reference/001-close-known-gaps/quickstart.md` (already drafted) and in the plugin README: exact command `$HERMES_HOME/hermes-agent/venv/bin/python scripts/live_drive_smoke.py`, env gate (HERMES_HOME, api.anthropic.com:443, host creds), exit codes 0/1/2. No harness code change.
 - [ ] T029 [US7] When a model provider is reachable (openrouter billing restored OR `hermes auth` for nous), run the command; record PASS (exit 0) to close Criterion 1, or the honest INCONCLUSIVE reason. (Environment-gated — may remain open at ship with the lane ready.)
 
 ---
