@@ -32,7 +32,7 @@ from pathlib import Path
 
 logger = logging.getLogger("hermes.plugins.anansi.store")
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # Per-table row caps (seed values; tune later with telemetry).
 CAPS = {
@@ -43,6 +43,16 @@ CAPS = {
     "telemetry": 2000,
     "goals": 50,
 }
+
+
+def _normalize_flagged_priority(value):
+    """Return zero or a positive integer for persisted priority fields."""
+    try:
+        priority = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+    return priority if priority > 0 else 0
+
 
 _DEFAULT_BUSY_TIMEOUT_MS = 5000
 
@@ -100,7 +110,16 @@ _SCHEMA_DDL = (
                                      status TEXT NOT NULL DEFAULT 'candidate'
                                      CHECK (status IN ('active','queued','backburner','candidate')),
                                      success_criteria TEXT, flagged_priority INTEGER NOT NULL DEFAULT 0,
-                                     domain TEXT, created_at TEXT, updated_at TEXT)""",
+                                     domain TEXT, created_at TEXT, updated_at TEXT,
+                                     support_style TEXT,
+                                     push_when_stalled INTEGER NOT NULL DEFAULT 0,
+                                     stall_threshold_days INTEGER)""",
+)
+
+_GOALS_V5_ADDED_COLUMNS = (
+    "support_style TEXT",
+    "push_when_stalled INTEGER NOT NULL DEFAULT 0",
+    "stall_threshold_days INTEGER",
 )
 
 
@@ -225,12 +244,59 @@ def _create_fresh(path: Path) -> bool:
                 pass
 
 
+def _try_upgrade_v4_to_v5(path: Path):
+    """Return True for an upgraded DB, None when temporarily unavailable.
+
+    ``False`` means a structural problem that follows the existing recovery
+    path. A lock is never structural corruption and must not quarantine state.
+    """
+    conn = None
+    try:
+        conn = sqlite3.connect(str(path))
+        conn.execute("PRAGMA busy_timeout=%d" % _DEFAULT_BUSY_TIMEOUT_MS)
+        row = conn.execute("PRAGMA quick_check").fetchone()
+        if row is None or row[0] != "ok":
+            return False
+        tables = {
+            row[0]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        if not set(_TABLES) <= tables:
+            return False
+        row = conn.execute(
+            "SELECT value FROM meta WHERE key='schema_version'"
+        ).fetchone()
+        if row is None or str(row[0]) != "4":
+            return False
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(goals)")}
+        with conn:
+            for definition in _GOALS_V5_ADDED_COLUMNS:
+                if definition.split()[0] not in existing:
+                    conn.execute("ALTER TABLE goals ADD COLUMN %s" % definition)
+            conn.execute(
+                "UPDATE meta SET value=? WHERE key='schema_version'",
+                (str(SCHEMA_VERSION),),
+            )
+    except sqlite3.OperationalError as exc:
+        if any(word in str(exc).lower() for word in ("locked", "busy", "unable to open")):
+            return None
+        return False
+    except Exception:
+        return False
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return _verify_structure(path)
+
+
 def ensure_db(db_path=None) -> bool:
     """Create the DB + schema if absent; verify structure if present.
 
-    ANY structural failure (corrupt file, bad quick_check, missing table,
-    schema_version mismatch) -> quarantine then recreate fresh. Returns True
-    if a usable DB exists at exit, False otherwise. Never raises.
+    A sound v4 database upgrades additively. A transient lock returns False
+    unchanged; remaining structural failures quarantine and recreate fresh.
     """
     try:
         path = Path(db_path) if db_path is not None else get_db_path()
@@ -238,6 +304,11 @@ def ensure_db(db_path=None) -> bool:
         if path.exists():
             if _verify_structure(path):
                 return True
+            upgraded = _try_upgrade_v4_to_v5(path)
+            if upgraded is True:
+                return True
+            if upgraded is None:
+                return False
             _quarantine(path)
         return _create_fresh(path)
     except Exception as exc:
@@ -450,7 +521,7 @@ def goal_momentum(goal, repo_root=None, now=None):
             }
         return {
             "momentum": "moving",
-            "stalled_days": None,
+            "stalled_days": 0,
             "salience": _MOMENTUM_SALIENCE["moving"],
         }
     except Exception:
@@ -524,6 +595,10 @@ def read_snapshot(db_path=None, include_decayed=False):
         # break read_snapshot's "None on any error, never raises" contract; on
         # failure goals simply carry the benign 'unknown' default.
         goals = _rows_as_dicts(conn, "goals")
+        for goal in goals:
+            goal["flagged_priority"] = _normalize_flagged_priority(
+                goal.get("flagged_priority")
+            )
         try:
             repo_root = _repo_root()
             for goal in goals:
@@ -611,6 +686,26 @@ def read_turns_since(after_id, db_path=None, limit=50):
                 conn.close()
             except Exception:
                 pass
+
+
+def _enforce_goal_cap(conn) -> None:
+    """Normalize malformed rows, then cap only ordinary goals."""
+    for goal_id, priority in conn.execute(
+        "SELECT id, flagged_priority FROM goals"
+    ):
+        normalized = _normalize_flagged_priority(priority)
+        if priority != normalized or not isinstance(priority, int):
+            conn.execute(
+                "UPDATE goals SET flagged_priority=? WHERE id=?",
+                (normalized, goal_id),
+            )
+    conn.execute(
+        "DELETE FROM goals WHERE COALESCE(flagged_priority, 0)=0"
+        " AND id NOT IN"
+        " (SELECT id FROM goals WHERE COALESCE(flagged_priority, 0)=0"
+        "  ORDER BY id DESC LIMIT ?)",
+        (CAPS["goals"],),
+    )
 
 
 def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
@@ -721,33 +816,51 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                         conn.execute(
                             "INSERT INTO goals"
                             " (text, status, success_criteria, flagged_priority,"
-                            " domain, created_at, updated_at)"
-                            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            " domain, created_at, updated_at, support_style,"
+                            " push_when_stalled, stall_threshold_days)"
+                            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (
                                 item.get("text"),
                                 item.get("status", "candidate"),
                                 item.get("success_criteria"),
-                                item.get("flagged_priority", 0),
+                                _normalize_flagged_priority(
+                                    item.get("flagged_priority", 0)
+                                ),
                                 item.get("domain"),
                                 now,
                                 now,
+                                item.get("support_style"),
+                                item.get("push_when_stalled", 0),
+                                item.get("stall_threshold_days"),
                             ),
                         )
                 elif key == "goals_update":
-                    # Absolute values, pre-validated by the caller.
+                    # Preserve omitted fields for callers using an older goal
+                    # shape. An explicitly present None still clears a field.
                     for item in payload:
+                        assignments = []
+                        values = []
+                        for field in (
+                            "text",
+                            "success_criteria",
+                            "flagged_priority",
+                            "domain",
+                            "support_style",
+                            "push_when_stalled",
+                            "stall_threshold_days",
+                        ):
+                            if field in item:
+                                assignments.append("%s=?" % field)
+                                value = item[field]
+                                if field == "flagged_priority":
+                                    value = _normalize_flagged_priority(value)
+                                values.append(value)
+                        assignments.append("updated_at=?")
+                        values.append(now)
+                        values.append(item.get("id"))
                         conn.execute(
-                            "UPDATE goals SET text=?, success_criteria=?,"
-                            " flagged_priority=?, domain=?, updated_at=?"
-                            " WHERE id=?",
-                            (
-                                item.get("text"),
-                                item.get("success_criteria"),
-                                item.get("flagged_priority", 0),
-                                item.get("domain"),
-                                now,
-                                item.get("id"),
-                            ),
+                            "UPDATE goals SET %s WHERE id=?" % ", ".join(assignments),
+                            values,
                         )
                 elif key == "goals_status":
                     # The promotion path candidate->active (and back).
@@ -790,12 +903,13 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
             # Enforce caps inside the SAME transaction: evict oldest rows
             # (lowest id) beyond each cap; trust_scores evicts oldest
             # updated_at beyond its cap.
-            for table in ("concerns", "contradictions", "turn_log", "goals"):
+            for table in ("concerns", "contradictions", "turn_log"):
                 conn.execute(
                     "DELETE FROM {t} WHERE id NOT IN"
                     " (SELECT id FROM {t} ORDER BY id DESC LIMIT ?)".format(t=table),
                     (CAPS[table],),
                 )
+            _enforce_goal_cap(conn)
             conn.execute(
                 "DELETE FROM trust_scores WHERE key NOT IN"
                 " (SELECT key FROM trust_scores"
@@ -822,8 +936,9 @@ def record_telemetry(outcome, *, wall_ms=None, model=None, tokens_in=None,
 
     The only write path besides apply_deltas(): a single quick INSERT plus
     cap eviction in one transaction — hot-path safe by design. `outcome` is
-    one of ok|timeout|parse_fail|llm_error|trust_fallback|skipped:<reason>
-    (free-form after `skipped:`). `error` is truncated to 300 chars.
+    one of ok|timeout|parse_fail|llm_error|trust_fallback|config_degraded|
+    skipped:<reason> (free-form after `skipped:`). `error` is truncated to
+    300 chars.
     Never raises; returns False on any failure (fail open, warning log only).
     """
     conn = None
@@ -873,8 +988,8 @@ def telemetry_summary(db_path=None):
 
     Read-only URI connection — never creates files. Returns
     {"total", "by_outcome", "failure_count", "last_error", "p50_wall_ms"}.
-    Non-failures are exactly ok/trust_fallback/reflect_ok plus the
-    skipped:* and reflect_skipped:* prefixes; failures are exactly
+    Non-failures are exactly ok/trust_fallback/reflect_ok/config_degraded plus
+    the skipped:* and reflect_skipped:* prefixes; failures are exactly
     timeout/llm_error/parse_fail/reflect_timeout/reflect_llm_error/
     reflect_parse_fail (exclusion-list shape on purpose — any future
     unknown outcome counts as a failure). last_error is the error of the
@@ -897,12 +1012,12 @@ def telemetry_summary(db_path=None):
         failure_count = sum(
             count
             for outcome, count in by_outcome.items()
-            if outcome not in ("ok", "trust_fallback", "reflect_ok")
+            if outcome not in ("ok", "trust_fallback", "reflect_ok", "config_degraded")
             and not outcome.startswith(("skipped:", "reflect_skipped:"))
         )
         row = conn.execute(
             "SELECT error FROM telemetry"
-            " WHERE outcome NOT IN ('ok', 'trust_fallback', 'reflect_ok')"
+            " WHERE outcome NOT IN ('ok', 'trust_fallback', 'reflect_ok', 'config_degraded')"
             " AND outcome NOT LIKE 'skipped:%'"
             " AND outcome NOT LIKE 'reflect_skipped:%'"
             " ORDER BY id DESC LIMIT 1"

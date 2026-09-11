@@ -57,8 +57,9 @@ implementation.
 
 ## Requirements
 
-The active ledger is `.planning/REQUIREMENTS.md`: 46 imported functional
-requirements remain pending, with Phase 11 deferred under constitution precedence.
+The active ledger is `.planning/REQUIREMENTS.md`: 12 of 46 imported functional
+requirements are verified complete on the Phase 8 branch; 34 remain pending,
+including Phase 11 under constitution precedence.
 Their full acceptance contracts retain 29 success criteria and 25 user stories in
 `.planning/intel/requirements.md`. Historical v1 checkmarks remain explicitly
 separate from current verification. No feature is completed by this migration.
@@ -86,9 +87,25 @@ The repository is public by Dr. Mani's direction. Commit, push and upstream
 submission still require their applicable explicit authorization. Automatic GSD
 document commits and phase advancement are disabled for this intake.
 
+## Phase 8 Verified Decisions
+
+- Firm pressure orders eligible ordinary notes by longest persisted stalled age
+  within the existing note and energy caps. Standard behavior stays unchanged;
+  flagged priorities remain protected from omission.
+- Legacy-shaped updates preserve omitted pressure consent. Invalid and non-finite
+  priorities normalize to ordinary priority; config diagnostics retain only the
+  rejected input's shape and the applied effective value.
+- Source `f23ee370` passed 199 offline tests and independent review; GSD verified
+  25/25 behaviors on 2026-09-11. Dr. Mani explicitly authorized the record commit,
+  main merge, push and task-worktree cleanup.
+- Live provider proof remains UNRUN and belongs to Phase 14. The next planned
+  increment is Phase 9, starting with worldview before episodes/user-dopamine.
+
 ## Historical Context
 
 Historical technical rationale remains in `.planning/DECISIONS.md`, existing
 phase contexts and `.planning/research/`. Explicit Phase 6 supersession governs
 bounded future heartbeat/user-dopamine work; it does not authorize autonomous
 outreach, a new memory provider, background daemons or a privilege ladder.
+
+*Last updated: 2026-09-11 after Phase 8 verification.*

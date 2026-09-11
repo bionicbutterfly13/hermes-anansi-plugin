@@ -8,9 +8,9 @@ EXEMPT from BOTH the per-category ``[:3]`` slice AND the token-cap
 trailing-line-drop, so it is never the dropped 4th item nor the dropped
 trailing line — even under adversarial crowding.
 
-APPR-05 precedence still holds: zero appraisal signals ⇒ render_block returns
-None even when a flagged goal exists (a flagged goal does NOT manufacture a
-block; surfacing rides a block that already renders, never forces one).
+For a successful appraisal with an empty signal mapping, persisted active
+flagged priorities still manufacture the protected guidance they are owed.
+Actual appraisal failure remains distinct: ``signals is None`` injects nothing.
 
 Anti-complacency: a stalled goal the user authorized for firmer support
 (support_style='firm' / push_when_stalled=1) renders a VISIBLE
@@ -222,16 +222,13 @@ def test_flagged_goal_renders_first():
 # ---------------------------------------------------------------------------
 
 
-def test_empty_signals_still_suppressed_with_flagged_goal():
-    """Zero appraisal signals + a flagged goal present ⇒ render_block returns
-    None. The flagged goal rides a block that already renders; it never forces
-    one (APPR-05 precedence holds)."""
+def test_successful_empty_signals_render_persisted_flagged_goal():
+    """A successful empty mapping still surfaces a persisted flagged want."""
     empty = appraisal.parse_signals({}, 0.6)
-    assert render.render_block(empty, goals=[_flagged_goal()]) is None
-    # Also with a snapshot — still None.
-    assert render.render_block(
-        empty, snapshot=LOW_TRUST_SNAPSHOT, goals=[_flagged_goal()]
-    ) is None
+    block = render.render_block(empty, goals=[_flagged_goal()])
+    assert block is not None
+    assert FLAG in block
+    assert block.split("\n")[2].startswith("- drive want:")
 
 
 def test_flagged_goal_renders_when_a_block_already_renders():
@@ -355,6 +352,115 @@ def _cfg(**overrides):
     }
     cfg.update(overrides)
     return cfg
+
+
+def _hook_result(signals):
+    return types.SimpleNamespace(
+        signals=signals,
+        outcome="ok",
+        wall_ms=0,
+        model="fake",
+        tokens_in=0,
+        tokens_out=0,
+        error=None,
+    )
+
+
+def _run_hook(monkeypatch, db_path, *, cfg, signals, session_id):
+    monkeypatch.setattr(store, "get_db_path", lambda: db_path)
+    monkeypatch.setattr(config, "get_cfg", lambda: cfg)
+    monkeypatch.setattr(appraisal, "should_skip", lambda *args: None)
+    monkeypatch.setattr(appraisal, "normalize_message", lambda value: value)
+    monkeypatch.setattr(
+        appraisal, "run_appraisal", lambda **kwargs: _hook_result(signals)
+    )
+    anansi.register(
+        types.SimpleNamespace(llm=object(), register_hook=lambda *args, **kwargs: None)
+    )
+    anansi._session_state.update({"session_id": None, "last_msg_norm": None})
+    try:
+        return anansi.pre_llm_call(session_id=session_id, user_message="status?")
+    finally:
+        anansi._ctx = None
+
+
+def test_persisted_flagged_priorities_survive_empty_signal_full_hook(tmp_path, monkeypatch):
+    """Persistence, domain selection, and rendering preserve every active want."""
+    db_path = tmp_path / "anansi" / "state.db"
+    assert store.ensure_db(db_path) is True
+    flagged = [
+        {
+            "text": "protected priority %02d" % index,
+            "status": "active",
+            "flagged_priority": 1,
+            "domain": "outside-domain",
+        }
+        for index in range(55)
+    ]
+    controls = [
+        {
+            "text": "ordinary out-of-domain control",
+            "status": "active",
+            "domain": "outside-domain",
+        },
+        {
+            "text": "flagged candidate control",
+            "status": "candidate",
+            "flagged_priority": 1,
+            "domain": "outside-domain",
+        },
+        {
+            "text": "flagged retired control",
+            "status": "backburner",
+            "flagged_priority": 1,
+            "domain": "outside-domain",
+        },
+    ]
+    assert store.apply_deltas({"goals_add": flagged + controls}, db_path) is True
+
+    snapshot = store.read_snapshot(db_path)
+    assert snapshot is not None
+    persisted = {goal["text"] for goal in snapshot["goals"]}
+    assert {"protected priority %02d" % index for index in range(55)} <= persisted
+
+    cfg = _cfg(drive_domains=["inside-domain"])
+    output = _run_hook(
+        monkeypatch, db_path, cfg=cfg, signals={}, session_id="empty-success"
+    )
+    assert isinstance(output, dict) and set(output) == {"context"}
+    wants = [
+        line for line in output["context"].split("\n")
+        if line.startswith("- drive want:")
+    ]
+    assert len(wants) == 55
+    assert all("I want fresh progress on protected priority" in line for line in wants)
+    assert "ordinary out-of-domain control" not in output["context"]
+    assert "flagged candidate control" not in output["context"]
+    assert "flagged retired control" not in output["context"]
+    assert "withheld" not in output["context"].lower()
+
+    assert _run_hook(
+        monkeypatch, db_path, cfg=cfg, signals=None, session_id="appraisal-failure"
+    ) is None
+
+    ordinary_signals = {"gut_reaction": "steady focus"}
+    drive_off = _run_hook(
+        monkeypatch,
+        db_path,
+        cfg=_cfg(drive_enabled=False),
+        signals=ordinary_signals,
+        session_id="drive-off",
+    )
+    control_db = tmp_path / "control" / "state.db"
+    assert store.ensure_db(control_db) is True
+    no_goals = _run_hook(
+        monkeypatch,
+        control_db,
+        cfg=_cfg(),
+        signals=ordinary_signals,
+        session_id="no-goals",
+    )
+    assert drive_off == no_goals
 
 
 def test_neveromit_full_hook(tmp_path, monkeypatch):

@@ -2,7 +2,6 @@
 
 **GSD migration, 2026-09-10:** the checked v1 ledger records historical implementation evidence, not fresh runtime verification. Phase 6 explicitly superseded the blanket heartbeat/user-dopamine exclusion for bounded future work. Constitution engineering invariants remain binding. Current imported work is under GSD Intake Requirements below; none is marked complete by this migration. Engineering references and extracted acceptance contracts are retained under `.planning/`, with retired workflow commands and paths normalized to GSD.
 
-
 v1 selection made 2026-06-10 during the autonomous ceremony (self-answered under Dr. Mani's
 mandate, following SUMMARY.md's recommended posture: table-stakes spine T1–T10 + near-free
 differentiators D4/D7 + shallow D1/D2; defer D3/D5/D6 depth until telemetry validates signal
@@ -92,20 +91,20 @@ acceptance contract before planning; a checkbox summary is not its full contract
 
 Source: `.planning/reference/001-close-known-gaps/spec.md`.
 
-- [ ] **REQ-001-close-known-gaps-fr-001**: Persist per-goal pressure metadata through the single SQLite store so it round-trips a read/write cycle.
-- [ ] **REQ-001-close-known-gaps-fr-002**: Migrate an existing goals table without data loss and without raising; goals lacking new fields read documented defaults.
-- [ ] **REQ-001-close-known-gaps-fr-003**: Read global drive_pressure and apply it to drive rendering, with invalid values coerced to the documented default.
-- [ ] **REQ-001-close-known-gaps-fr-004**: Emit a legible telemetry row whenever a config value is coerced away from the user-supplied value.
-- [ ] **REQ-001-close-known-gaps-fr-005**: Redact secret-like config values in degradation telemetry and never raise or block the turn if telemetry storage is unavailable.
-- [ ] **REQ-001-close-known-gaps-fr-006**: Bound rendered flagged wants with a proportionate cap while guaranteeing the highest-priority flagged wants render and visibly indicating withheld wants.
+- [x] **REQ-001-close-known-gaps-fr-001**: Persist per-goal pressure metadata through the single SQLite store so it round-trips a read/write cycle.
+- [x] **REQ-001-close-known-gaps-fr-002**: Migrate an existing goals table without data loss and without raising; goals lacking new fields read documented defaults.
+- [x] **REQ-001-close-known-gaps-fr-003**: Read global drive_pressure and apply it to drive rendering, with invalid values coerced to the documented default.
+- [x] **REQ-001-close-known-gaps-fr-004**: Emit a legible telemetry row whenever a config value is coerced away from the user-supplied value.
+- [x] **REQ-001-close-known-gaps-fr-005**: Redact secret-like config values in degradation telemetry and never raise or block the turn if telemetry storage is unavailable.
+- [x] **REQ-001-close-known-gaps-fr-006**: Bound rendered flagged wants with a proportionate cap while guaranteeing the highest-priority flagged wants render and visibly indicating withheld wants.
   Source variant superseded by Principle III: reconcile without withholding any persisted flagged priority. The cap wording is provenance, not implementation authority.
-- [ ] **REQ-001-close-known-gaps-fr-007**: Keep the never-omit invariant under the cap, verified against persisted state rather than model output.
+- [x] **REQ-001-close-known-gaps-fr-007**: Keep the never-omit invariant under the cap, verified against persisted state rather than model output.
   Source variant superseded by Principle III: reconcile without withholding any persisted flagged priority. The cap wording is provenance, not implementation authority.
-- [ ] **REQ-001-close-known-gaps-fr-008**: Avoid false-positive goal-to-signal associations caused by loose substring matching while preserving legitimate associations.
-- [ ] **REQ-001-close-known-gaps-fr-009**: Handle stalled_days=0 with a well-formed fresh/active read distinct from stalled rendering and an empty line.
-- [ ] **REQ-001-close-known-gaps-fr-010**: Provide a documented single-command live-smoke lane for first-person owned-want voice and report an honest environment-gated outcome when no provider is reachable.
-- [ ] **REQ-001-close-known-gaps-fr-011**: Rename master kill switch terminology in tests/comments to primary/main with no runtime behavior change.
-- [ ] **REQ-001-close-known-gaps-fr-012**: Hold all constitution principles; keep full fail-open matrix and never-omit tests green without weakening a principle.
+- [x] **REQ-001-close-known-gaps-fr-008**: Avoid false-positive goal-to-signal associations caused by loose substring matching while preserving legitimate associations.
+- [x] **REQ-001-close-known-gaps-fr-009**: Handle stalled_days=0 with a well-formed fresh/active read distinct from stalled rendering and an empty line.
+- [x] **REQ-001-close-known-gaps-fr-010**: Provide a documented single-command live-smoke lane for first-person owned-want voice and report an honest environment-gated outcome when no provider is reachable.
+- [x] **REQ-001-close-known-gaps-fr-011**: Rename master kill switch terminology in tests/comments to primary/main with no runtime behavior change.
+- [x] **REQ-001-close-known-gaps-fr-012**: Hold all constitution principles; keep full fail-open matrix and never-omit tests green without weakening a principle.
 
 ### 002: Autobiographical User Model (Phase 9)
 
@@ -177,7 +176,7 @@ Source: `.planning/reference/007-drive-security-verification/spec.md`.
 
 | Source feature | Functional requirements | GSD phase | State |
 |---|---:|---:|---|
-| 001 | 12 | 8 | Pending verification/planning |
+| 001 | 12 | 8 | Complete on Phase 8 branch; verified 2026-09-11 |
 | 002 | 8 | 9 | Pending verification/planning |
 | 003 | 7 | 10 | Pending verification/planning |
 | 004 | 5 | 11 | Deferred, authority gate |

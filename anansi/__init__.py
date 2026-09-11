@@ -31,6 +31,14 @@ _ctx = None
 _session_state = {"session_id": None, "last_msg_norm": None}
 
 
+def _is_positive_priority(goal):
+    """Return whether a goal has a valid user-flagged priority."""
+    try:
+        return int(goal.get("flagged_priority")) > 0
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        return False
+
+
 def _filter_goals_by_domain(goals, drive_domains):
     """DRIVE-06 containment: keep only goals whose ``domain`` is in the
     whitelist when the whitelist is NON-empty; an empty whitelist means NO
@@ -38,14 +46,19 @@ def _filter_goals_by_domain(goals, drive_domains):
     returns the UNFILTERED goals (a filter bug must never crash the hook or
     silently drop everything)."""
     try:
-        if not goals or not drive_domains:
-            return goals
+        active_goals = [
+            goal for goal in (goals or [])
+            if isinstance(goal, dict) and goal.get("status") == "active"
+        ]
+        if not drive_domains:
+            return active_goals
         allowed = {str(d).strip() for d in drive_domains if str(d).strip()}
         if not allowed:
-            return goals
+            return active_goals
         kept = [
-            g for g in goals
-            if isinstance(g, dict) and str(g.get("domain") or "").strip() in allowed
+            goal for goal in active_goals
+            if _is_positive_priority(goal)
+            or str(goal.get("domain") or "").strip() in allowed
         ]
         return kept
     except Exception:
@@ -63,10 +76,12 @@ def _filter_signals_by_goals(goal_signals, goals, drive_domains):
     try:
         if not drive_domains or not goal_signals:
             return goal_signals
+        from . import render
+
         texts = [
-            str(g.get("text") or "").strip().lower()
+            g.get("text")
             for g in (goals or [])
-            if isinstance(g, dict) and str(g.get("text") or "").strip()
+            if isinstance(g, dict) and render._goal_tokens(g.get("text"))
         ]
         if not texts:
             return []  # whitelist active but no whitelisted goal -> none surface
@@ -74,12 +89,25 @@ def _filter_signals_by_goals(goal_signals, goals, drive_domains):
         for sig in goal_signals:
             if not isinstance(sig, dict):
                 continue
-            relates = str(sig.get("relates_to_goal") or "").strip().lower()
-            if relates and any(relates in t or t in relates for t in texts):
+            relates = sig.get("relates_to_goal")
+            if any(render._goal_text_matches(text, relates) for text in texts):
                 kept.append(sig)
         return kept
     except Exception:
         return goal_signals
+
+
+def _config_degradation_error(key, shape, applied_default):
+    """Format a config diagnostic without rendering a rejected value."""
+    if isinstance(applied_default, str) and applied_default.startswith("<") and applied_default.endswith(">"):
+        applied = applied_default
+    elif isinstance(applied_default, (str, int, float, bool)) or applied_default is None:
+        applied = repr(applied_default)
+    elif isinstance(applied_default, (list, tuple, dict)):
+        applied = "<%s len=%d>" % (type(applied_default).__name__, len(applied_default))
+    else:
+        applied = "<%s>" % type(applied_default).__name__
+    return "%s: rejected %s, applied %s" % (key, shape, applied)
 
 
 def _fail_open(fn):
@@ -134,6 +162,24 @@ def on_session_start(session_id="", platform="", **kwargs):
 
     if not store.ensure_db():
         logger.debug("anansi state store unavailable — continuing without state")
+
+    # Diagnostics have their own fail-open boundary. A lost observation cannot
+    # change reflection or the next appraisal hook's output.
+    try:
+        config.get_cfg()
+        for key, shape, applied_default in config.get_degradations():
+            try:
+                store.record_telemetry(
+                    "config_degraded",
+                    error=_config_degradation_error(key, shape, applied_default),
+                    session_id=session_id,
+                )
+            except Exception:
+                logger.debug(
+                    "anansi config-degradation telemetry unavailable", exc_info=True
+                )
+    except Exception:
+        logger.debug("anansi config-degradation telemetry skipped", exc_info=True)
 
     llm = getattr(_ctx, "llm", None) if _ctx is not None else None
     reflection.maybe_reflect(llm=llm, session_id=session_id)
@@ -251,9 +297,10 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
     # render_block, after the protected flagged prefix is assembled, so a
     # flagged want is never dropped to satisfy the budget. None ⇒ no cap.
     energy_budget = cfg.get("drive_energy_budget") if drive_on else None
+    pressure = cfg.get("drive_pressure") if drive_on else None
     block = render.render_block(
         result.signals, snapshot=snapshot, goals=goals,
-        energy_budget=energy_budget,
+        energy_budget=energy_budget, pressure=pressure,
     )
     if block is None:  # empty-signal suppression (APPR-05)
         return None

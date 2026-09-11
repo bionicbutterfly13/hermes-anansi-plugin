@@ -125,7 +125,7 @@ These seven phases are the active imported work. Phase numbers retain the histor
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 8. Close Known Gaps | 0/4 | Not started | - |
+| 8. Close Known Gaps | 5/5 | Complete    | 2026-09-11 |
 | 9. Autobiographical User Model | 0/TBD | Not started | - |
 | 10. Reconsolidation and Heartbeat | 0/TBD | Not started | - |
 | 11. Interruption Lanes | 0/TBD | Deferred | - |
@@ -145,30 +145,33 @@ Phase identifiers map the seven source specs; they do not impose a new total ord
 
 **Requirements:** REQ-001-close-known-gaps-fr-001, REQ-001-close-known-gaps-fr-002, REQ-001-close-known-gaps-fr-003, REQ-001-close-known-gaps-fr-004, REQ-001-close-known-gaps-fr-005, REQ-001-close-known-gaps-fr-006, REQ-001-close-known-gaps-fr-007, REQ-001-close-known-gaps-fr-008, REQ-001-close-known-gaps-fr-009, REQ-001-close-known-gaps-fr-010, REQ-001-close-known-gaps-fr-011, REQ-001-close-known-gaps-fr-012
 
-**Status:** Planned; four plans passed independent review. Execution not started.
+**Status:** Complete, 2026-09-11: five plans, 25/25 verified behaviors, 199 passing offline tests. Main merge and publication explicitly authorized.
 
 **Source:** `.planning/reference/001-close-known-gaps/spec.md`; complete acceptance contract in `.planning/intel/requirements.md`.
 
 **Success criteria:** Map all source user-story scenarios and SC IDs to verification evidence during planning. This migration satisfies no feature acceptance criterion.
 
-**Plans:** 4 plans
+**Plans:** 5/5 plans complete
 
-Plans:
 **Wave 1**
 
-- [ ] 08-01-PLAN.md — Persist pressure settings and migrate schema v4 to v5 without treating locks as corruption.
+- [x] 08-01-PLAN.md — Persist pressure settings and migrate schema v4 to v5 without treating locks as corruption.
 
-**Wave 2** *(blocked on Wave 1 completion)*
+**Wave 2**
 
-- [ ] 08-02-PLAN.md — Record secret-safe configuration degradation without changing hook output on telemetry failure.
+- [x] 08-02-PLAN.md — Record secret-safe configuration degradation without changing hook output on telemetry failure.
 
-**Wave 3** *(blocked on Wave 2 completion)*
+**Wave 3**
 
-- [ ] 08-03-PLAN.md — Preserve flagged priorities end to end and ground matching, freshness, and ordering in persisted state.
+- [x] 08-03-PLAN.md — Preserve flagged priorities end to end and ground matching, freshness, and ordering in persisted state.
 
-**Wave 4** *(blocked on Wave 3 completion)*
+**Wave 4**
 
-- [ ] 08-04-PLAN.md — Finish terminology cleanup, codify the live-smoke evidence boundary, and run the constitutional gate.
+- [x] 08-04-PLAN.md — Finish terminology cleanup, codify the live-smoke evidence boundary, and run the constitutional gate.
+
+**Wave 5: Verification gap closure**
+
+- [x] 08-05-PLAN.md: Handle non-finite integer configuration and verify per-session diagnostics.
 
 ### Phase 9: Autobiographical User Model
 

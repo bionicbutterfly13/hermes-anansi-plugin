@@ -141,9 +141,10 @@ Use the two precedence resolutions in `.planning/INGEST-CONFLICTS.md` when plann
 ## Current Phase
 
 **Milestone:** imported backlog reconciliation and verification.
-**Phase:** 8 - Close Known Gaps, four plans independently verified.
-**Status:** Ready to execute; implementation has not started.
-**Last updated:** 2026-09-10.
+**Completed:** Phase 8 - Close Known Gaps, five plans, 12 requirements, 25/25 verified behaviors and 199 passing offline tests.
+**Next phase:** 9 - Autobiographical User Model; worldview first, planning not started.
+**Live-provider evidence:** UNRUN, deferred to Phase 14.
+**Last updated:** 2026-09-11.
 
 ## Project Structure
 

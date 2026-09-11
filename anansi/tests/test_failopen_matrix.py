@@ -64,6 +64,7 @@ import json
 import sqlite3
 import time
 import types
+from datetime import datetime, timezone
 
 import pytest
 
@@ -117,9 +118,11 @@ class _CountingCaller:
     def __init__(self, payload):
         self.calls = 0
         self.payload = payload
+        self.messages = []
 
     def __call__(self, *, messages, model_override=None, **kwargs):
         self.calls += 1
+        self.messages.append(messages)
         if isinstance(self.payload, Exception):
             raise self.payload
         content = (
@@ -445,6 +448,123 @@ def test_drive_disabled_is_non_failure(pinned_env):
     assert summary["by_outcome"].get("skipped:drive_disabled") == 1
 
 
+def test_session_start_emits_one_secret_safe_config_row_per_degradation(
+    matrix_env, monkeypatch
+):
+    secret = "sk-rejected-config-value-should-never-persist"
+    invalid_parse = "not-a-number"
+    raw_domain = "infrastructure"
+    monkeypatch.setattr(
+        config,
+        "_load_host_entry",
+        lambda: {
+            "deadline_seconds": 99,
+            "reflect_deadline_seconds": 0.1,
+            "confidence_threshold": invalid_parse,
+            "drive_domains": [raw_domain, " "],
+            "drive_pressure": secret,
+        },
+    )
+
+    assert anansi.on_session_start(session_id="degraded") is None
+    conn = sqlite3.connect("file:%s?mode=ro" % matrix_env.db_path, uri=True)
+    try:
+        rows = conn.execute(
+            "SELECT error FROM telemetry WHERE outcome='config_degraded' ORDER BY id"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    assert rows == [
+        ("confidence_threshold: rejected <str len=%d>, applied 0.6" % len(invalid_parse),),
+        ("deadline_seconds: rejected <int>, applied 10.0",),
+        ("reflect_deadline_seconds: rejected <float>, applied 0.5",),
+        ("drive_domains: rejected <list len=2>, applied <list len=1>",),
+        ("drive_pressure: rejected <str len=%d>, applied 'standard'" % len(secret),),
+    ]
+    assert all(raw not in row[0] for raw in (secret, invalid_parse, raw_domain) for row in rows)
+
+
+def test_session_start_valid_config_emits_no_degradation_rows(matrix_env, monkeypatch):
+    monkeypatch.setattr(
+        config,
+        "_load_host_entry",
+        lambda: {"deadline_seconds": " 8 ", "drive_pressure": " FIRM "},
+    )
+
+    assert anansi.on_session_start(session_id="valid") is None
+
+    assert "config_degraded" not in [row[0] for row in _telemetry_rows(matrix_env.db_path)]
+
+
+@pytest.mark.parametrize("value", [float("inf"), float("-inf")])
+def test_session_start_records_nonfinite_integer_degradations_per_reload(
+    matrix_env, monkeypatch, value
+):
+    """Each real session reload records one shape-only row for every int key."""
+    defaults = {
+        "history_chars": 4000,
+        "max_tokens": 700,
+        "reflect_every_n_turns": 5,
+        "reflect_max_tokens": 700,
+        "drive_energy_budget": 3,
+    }
+    monkeypatch.setattr(
+        config, "_load_host_entry", lambda: dict.fromkeys(defaults, value)
+    )
+
+    assert anansi.on_session_start(session_id="first") is None
+    assert anansi.on_session_start(session_id="second") is None
+    conn = sqlite3.connect("file:%s?mode=ro" % matrix_env.db_path, uri=True)
+    try:
+        rows = conn.execute(
+            "SELECT session_id, error FROM telemetry "
+            "WHERE outcome='config_degraded' ORDER BY id"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    expected_errors = [
+        "%s: rejected <float>, applied %r" % (key, default)
+        for key, default in defaults.items()
+    ]
+    assert rows == [("first", error) for error in expected_errors] + [
+        ("second", error) for error in expected_errors
+    ]
+    assert all(str(value) not in error for _, error in rows)
+
+
+@pytest.mark.parametrize("failure", [False, RuntimeError("telemetry unavailable")])
+def test_unavailable_config_telemetry_does_not_change_next_hook_output(
+    matrix_env, monkeypatch, failure
+):
+    """A lost diagnostic never alters the next ordinary appraisal injection."""
+    monkeypatch.setattr(
+        config, "_load_host_entry", lambda: {"drive_pressure": "invalid"}
+    )
+    message = "how is the migration going?"
+
+    assert anansi.on_session_start(session_id="control") is None
+    control = anansi.pre_llm_call(session_id="control", user_message=message)
+
+    config.reset_cache()
+    anansi._session_state.update({"session_id": None, "last_msg_norm": None})
+    original_record = store.record_telemetry
+
+    def unavailable_record(outcome, *args, **kwargs):
+        if outcome == "config_degraded":
+            if failure is False:
+                return False
+            raise failure
+        return original_record(outcome, *args, **kwargs)
+
+    monkeypatch.setattr(store, "record_telemetry", unavailable_record)
+    assert anansi.on_session_start(session_id="unavailable") is None
+    actual = anansi.pre_llm_call(session_id="unavailable", user_message=message)
+
+    assert actual == control
+
+
 # ---------------------------------------------------------------------------
 # DRIVE-02: read-time velocity fail-open rows (07-02). Absent/corrupt .git,
 # an unparseable reflog, and a bad timestamp ALL degrade to 'unknown'
@@ -557,6 +677,144 @@ def test_drive_whitelist_suppression_full_hook(pinned_env):
     # proj-b was suppressed before the model ever saw it; never raises.
     assert "ship proj-b feature" not in out["context"]
     assert _telemetry_rows(pinned_env.db_path) == [("ok",)]
+
+
+def test_domain_whitelist_only_exempts_positive_priorities(pinned_env):
+    """Malformed ordinary priorities stay outside the model prompt."""
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {
+                    "text": "allowed project",
+                    "status": "active",
+                    "domain": "proj-a",
+                },
+                {
+                    "text": "negative private goal",
+                    "status": "active",
+                    "domain": "private",
+                    "flagged_priority": -1,
+                },
+                {
+                    "text": "string zero private goal",
+                    "status": "active",
+                    "domain": "private",
+                    "flagged_priority": "0",
+                },
+                {
+                    "text": "positive private priority",
+                    "status": "active",
+                    "domain": "private",
+                    "flagged_priority": 2,
+                },
+            ]
+        },
+        pinned_env.db_path,
+    ) is True
+    caller = _CountingCaller(RICH_PAYLOAD)
+    pinned_env.state["cfg"] = _cfg(
+        drive_enabled=True, drive_domains=["proj-a"]
+    )
+    pinned_env.state["caller"] = caller
+
+    out = anansi.pre_llm_call(
+        session_id="priority-domain", user_message="status?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    prompt = json.dumps(caller.messages)
+    assert "negative private goal" not in prompt
+    assert "string zero private goal" not in prompt
+    assert "positive private priority" in prompt
+
+
+def test_domain_whitelist_rejects_raw_infinite_priority(pinned_env):
+    """An off-domain legacy infinity value cannot trigger filter fallback."""
+    raw_goal = {
+        "text": "infinite private goal",
+        "status": "active",
+        "domain": "private",
+        "flagged_priority": float("inf"),
+    }
+    assert anansi._filter_goals_by_domain([raw_goal], ["proj-a"]) == []
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {
+                    "text": "valid private priority",
+                    "status": "active",
+                    "domain": "private",
+                    "flagged_priority": 2,
+                }
+            ]
+        },
+        pinned_env.db_path,
+    ) is True
+    now = datetime.now(timezone.utc).isoformat()
+    conn = sqlite3.connect(str(pinned_env.db_path))
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO goals "
+                "(text, status, flagged_priority, domain, created_at, updated_at) "
+                "VALUES (?, 'active', ?, 'private', ?, ?)",
+                ("infinite private goal", float("inf"), now, now),
+            )
+    finally:
+        conn.close()
+
+    caller = _CountingCaller(RICH_PAYLOAD)
+    pinned_env.state["cfg"] = _cfg(
+        drive_enabled=True, drive_domains=["proj-a"]
+    )
+    pinned_env.state["caller"] = caller
+    out = anansi.pre_llm_call(
+        session_id="infinite-priority", user_message="status?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    prompt = json.dumps(caller.messages)
+    assert "infinite private goal" not in prompt
+    assert "valid private priority" in prompt
+
+
+def test_fresh_persisted_goal_reaches_hook_with_zero_day_evidence(
+    pinned_env, monkeypatch
+):
+    """A current persisted timestamp remains fresh through snapshot and render."""
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {
+                    "text": "current implementation work",
+                    "status": "active",
+                    "domain": "anansi",
+                }
+            ]
+        },
+        pinned_env.db_path,
+    ) is True
+    monkeypatch.setattr(store, "_repo_root", lambda: None)
+
+    snapshot = store.read_snapshot(pinned_env.db_path)
+    assert snapshot is not None
+    momentum = snapshot["goals"][0]["momentum"]
+    assert momentum["momentum"] == "moving"
+    assert momentum["stalled_days"] == 0
+
+    payload = dict(RICH_PAYLOAD)
+    payload["goal_signals"] = [
+        {"relates_to_goal": "current implementation work", "confidence": 0.9}
+    ]
+    pinned_env.state["caller"] = _CountingCaller(payload)
+    out = anansi.pre_llm_call(
+        session_id="fresh-persisted", user_message="status?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    note = next(
+        line for line in out["context"].split("\n")
+        if line.startswith("- drive note:")
+    )
+    assert "fresh activity" in note
+    assert "stalled" not in note
 
 
 def test_drive_budget_cap_full_hook(pinned_env):

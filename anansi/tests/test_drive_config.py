@@ -14,12 +14,118 @@ build_context / render_block directly or a tmp DB — the real $HERMES_HOME is
 never touched.
 """
 
+import os
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+
+import anansi
 from anansi import appraisal, config, render, store
 
 
 # ---------------------------------------------------------------------------
 # Config coercion — get_cfg never raises on malformed drive values
 # ---------------------------------------------------------------------------
+
+
+_INTEGER_CONFIG_CASES = (
+    ("history_chars", config.DEFAULT_HISTORY_CHARS, "4000", -1, 0, None),
+    ("max_tokens", config.DEFAULT_MAX_TOKENS, "700", 0, 1, None),
+    (
+        "reflect_every_n_turns",
+        config.DEFAULT_REFLECT_EVERY_N_TURNS,
+        "5",
+        0,
+        1,
+        50,
+    ),
+    (
+        "reflect_max_tokens",
+        config.DEFAULT_REFLECT_MAX_TOKENS,
+        "700",
+        0,
+        1,
+        None,
+    ),
+    (
+        "drive_energy_budget",
+        config.DEFAULT_DRIVE_ENERGY_BUDGET,
+        "3",
+        -1,
+        0,
+        None,
+    ),
+)
+
+
+def test_native_nonfinite_integer_values_degrade_to_defaults(monkeypatch):
+    """Every integer setting handles native non-finite floats without raising."""
+    for value in (float("inf"), float("-inf"), float("nan")):
+        for key, default, _, _, _, _ in _INTEGER_CONFIG_CASES:
+            monkeypatch.setattr(
+                config, "_load_host_entry", lambda k=key, v=value: {k: v}
+            )
+
+            cfg = config.get_cfg(force_reload=True)
+
+            assert cfg[key] == default
+            assert config.get_degradations() == [(key, "<float>", default)]
+
+
+def test_integer_config_strings_and_bounds_remain_unchanged(monkeypatch):
+    """The non-finite guard does not alter accepted or clamped finite values."""
+    for key, _, normalized, below, expected_below, upper in _INTEGER_CONFIG_CASES:
+        monkeypatch.setattr(
+            config, "_load_host_entry", lambda k=key, v=normalized: {k: v}
+        )
+        assert config.get_cfg(force_reload=True)[key] == int(normalized)
+        assert config.get_degradations() == []
+
+        monkeypatch.setattr(
+            config, "_load_host_entry", lambda k=key, v=below: {k: v}
+        )
+        assert config.get_cfg(force_reload=True)[key] == expected_below
+
+        if upper is not None:
+            monkeypatch.setattr(
+                config, "_load_host_entry", lambda k=key, v=upper + 1: {k: v}
+            )
+            assert config.get_cfg(force_reload=True)[key] == upper
+
+
+def test_nonfinite_integer_degradations_are_cached_then_reloaded(monkeypatch):
+    """A cache hit has no load or descriptor side effect; reset rebuilds once."""
+    calls = []
+    entry = {
+        key: float("inf")
+        for key, _, _, _, _, _ in _INTEGER_CONFIG_CASES
+    }
+
+    def load_entry():
+        calls.append(None)
+        return entry
+
+    monkeypatch.setattr(config, "_load_host_entry", load_entry)
+    expected = [
+        (key, "<float>", default)
+        for key, default, _, _, _, _ in _INTEGER_CONFIG_CASES
+    ]
+
+    first = config.get_cfg(force_reload=True)
+    assert config.get_degradations() == expected
+    assert config.get_cfg() == first
+    assert config.get_degradations() == expected
+    assert len(calls) == 1
+
+    config.reset_cache()
+    assert config.get_degradations() == []
+    entry = {
+        key: float("-inf")
+        for key, _, _, _, _, _ in _INTEGER_CONFIG_CASES
+    }
+    second = config.get_cfg()
+    assert second == first
+    assert config.get_degradations() == expected
+    assert len(calls) == 2
 
 
 def test_drive_domains_coerced(monkeypatch):
@@ -80,6 +186,100 @@ def test_drive_pressure_coerced(monkeypatch):
     for junk in ("nonsense", 42, None, [], {}):
         monkeypatch.setattr(config, "_load_host_entry", lambda j=junk: {"drive_pressure": j})
         assert config.get_cfg(force_reload=True)["drive_pressure"] == "standard"
+
+
+def test_config_degradations_are_shape_only_and_once_per_key(monkeypatch):
+    """Every rejected or clamped provided key has one secret-safe descriptor."""
+    rejected_secret = "sk-rejected-config-value-should-never-persist"
+    entry = {
+        "enabled": "maybe",
+        "confidence_threshold": "not-a-number",
+        "deadline_seconds": 999,
+        "history_chars": -1,
+        "max_tokens": 0,
+        "reflection_enabled": None,
+        "reflect_every_n_turns": 99,
+        "reflect_max_tokens": 0,
+        "reflect_deadline_seconds": 0.1,
+        "drive_enabled": {},
+        "drive_domains": ["allowed", "  "],
+        "drive_energy_budget": -1,
+        "drive_pressure": rejected_secret,
+        "llm": {"model": "  "},
+    }
+    monkeypatch.setattr(config, "_load_host_entry", lambda: entry)
+
+    config.get_cfg(force_reload=True)
+    degradations = config.get_degradations()
+
+    assert {record[0] for record in degradations} == {
+        "enabled", "confidence_threshold", "deadline_seconds", "history_chars",
+        "max_tokens", "reflection_enabled", "reflect_every_n_turns",
+        "reflect_max_tokens", "reflect_deadline_seconds", "drive_enabled",
+        "drive_domains", "drive_energy_budget", "drive_pressure", "model",
+    }
+    assert len(degradations) == 14
+    assert all(len(record) == 3 for record in degradations)
+    assert all(rejected_secret not in repr(record) for record in degradations)
+    assert all(record[1].startswith("<") for record in degradations)
+
+
+def test_config_degradations_describe_effective_values_without_raw_inputs(monkeypatch):
+    """Descriptors retain only each key's applied effective value or shape."""
+    invalid_parse = "not-a-number"
+    raw_domain = "infrastructure"
+    entry = {
+        "confidence_threshold": invalid_parse,
+        "deadline_seconds": 999,
+        "reflect_deadline_seconds": 0.1,
+        "drive_domains": [raw_domain, " "],
+    }
+    monkeypatch.setattr(config, "_load_host_entry", lambda: entry)
+
+    cfg = config.get_cfg(force_reload=True)
+    degradations = dict((key, (shape, applied)) for key, shape, applied in config.get_degradations())
+
+    assert cfg["confidence_threshold"] == config.DEFAULT_CONFIDENCE_THRESHOLD
+    assert cfg["deadline_seconds"] == 10.0
+    assert cfg["reflect_deadline_seconds"] == 0.5
+    assert cfg["drive_domains"] == [raw_domain]
+    assert degradations["confidence_threshold"] == ("<str len=%d>" % len(invalid_parse), 0.6)
+    assert degradations["deadline_seconds"] == ("<int>", 10.0)
+    assert degradations["reflect_deadline_seconds"] == ("<float>", 0.5)
+    assert degradations["drive_domains"] == ("<list len=2>", "<list len=1>")
+    assert invalid_parse not in repr(degradations)
+    assert raw_domain not in repr(degradations)
+
+
+def test_config_degradations_ignore_normalization_and_cached_reads(monkeypatch):
+    """Valid normalization is not degradation, and cache hits do not duplicate it."""
+    entry = {
+        "enabled": " YES ",
+        "confidence_threshold": "0.75",
+        "deadline_seconds": " 8 ",
+        "history_chars": "4000",
+        "max_tokens": "700",
+        "reflection_enabled": "off",
+        "reflect_every_n_turns": "5",
+        "reflect_max_tokens": "700",
+        "reflect_deadline_seconds": "8.0",
+        "drive_enabled": 1,
+        "drive_domains": ["  project-a  ", 7],
+        "drive_energy_budget": "3",
+        "drive_pressure": " FIRM ",
+        "llm": {"model": " model-name "},
+    }
+    monkeypatch.setattr(config, "_load_host_entry", lambda: entry)
+
+    first = config.get_cfg(force_reload=True)
+    first_degradations = config.get_degradations()
+    second = config.get_cfg()
+
+    assert first == second
+    assert first_degradations == []
+    assert config.get_degradations() == []
+    config.reset_cache()
+    assert config.get_degradations() == []
 
 
 # ---------------------------------------------------------------------------
@@ -229,3 +429,219 @@ def test_budget_malformed_falls_back_to_top3():
     assert block is not None
     note_lines = [ln for ln in block.split("\n") if ln.startswith("- drive note:")]
     assert len(note_lines) == 3
+
+
+# ---------------------------------------------------------------------------
+# Global pressure policy — full-hook drive effects stay bounded and fail-open
+# ---------------------------------------------------------------------------
+
+
+def _run_pressure_hook(monkeypatch, pressure, drive_enabled=True):
+    """Exercise the hook with deterministic appraisal output and no live I/O."""
+    signals = _signals_with_n_goal_notes(3)
+    result = SimpleNamespace(
+        signals=signals, outcome="ok", wall_ms=0, model="fake", tokens_in=0,
+        tokens_out=0, error=None,
+    )
+    monkeypatch.setattr(config, "get_cfg", lambda: {
+        "enabled": True,
+        "drive_enabled": drive_enabled,
+        "drive_domains": [],
+        "drive_energy_budget": 3,
+        "drive_pressure": pressure,
+    })
+    monkeypatch.setattr(store, "read_snapshot", lambda: {"goals": []})
+    monkeypatch.setattr(store, "record_telemetry", lambda *a, **kw: None)
+    monkeypatch.setattr(appraisal, "should_skip", lambda *a: None)
+    monkeypatch.setattr(appraisal, "normalize_message", lambda value: value)
+    monkeypatch.setattr(appraisal, "run_appraisal", lambda **kwargs: result)
+    anansi.register(SimpleNamespace(llm=object(), register_hook=lambda *a, **k: None))
+    anansi._session_state.update({"session_id": None, "last_msg_norm": None})
+    try:
+        return anansi.pre_llm_call(session_id="pressure", user_message="status?")
+    finally:
+        anansi._ctx = None
+
+
+def _run_persisted_pressure_hook(
+    tmp_path, monkeypatch, pressure, goal_specs, goal_signals, energy_budget=3
+):
+    """Run a real temporary store through the hook with deterministic signals.
+
+    ``goal_specs`` supplies ``text``, pressure fields, confidence, and an
+    actual file age.  The hook reads its snapshot itself; only the appraisal
+    result is faked, so goal ordering still travels through apply_deltas,
+    read_snapshot, read-time momentum, enrichment, and rendering.
+    """
+    db = tmp_path / "state.db"
+    repo = tmp_path / "repo"
+    repo.mkdir(parents=True)
+    now = datetime.now(timezone.utc)
+    goals = []
+    for index, spec in enumerate(goal_specs):
+        domain = "goal-%d.txt" % index
+        path = repo / domain
+        path.write_text(spec["text"], encoding="utf-8")
+        aged_at = (now - timedelta(days=spec["age_days"])).timestamp()
+        os.utime(path, (aged_at, aged_at))
+        goal = dict(spec)
+        goal.pop("age_days")
+        goal.pop("confidence")
+        goal["status"] = "active"
+        goal["domain"] = domain
+        goals.append(goal)
+
+    assert store.ensure_db(db) is True
+    assert store.apply_deltas({"goals_add": goals}, db) is True
+    monkeypatch.setattr(store, "get_db_path", lambda: db)
+    monkeypatch.setattr(store, "_repo_root", lambda: repo)
+    monkeypatch.setattr(config, "get_cfg", lambda: {
+        "enabled": True,
+        "drive_enabled": True,
+        "drive_domains": [],
+        "drive_energy_budget": energy_budget,
+        "drive_pressure": pressure,
+    })
+    result = SimpleNamespace(
+        signals={
+            "instincts": [],
+            "salient_observations": [{"text": "same state", "confidence": 0.9}],
+            "contradiction_flags": [],
+            "suggested_memory_searches": [],
+            "goal_signals": goal_signals,
+            "gut_reaction": "",
+        },
+        outcome="ok", wall_ms=0, model="fake", tokens_in=0,
+        tokens_out=0, error=None,
+    )
+    monkeypatch.setattr(store, "record_telemetry", lambda *a, **kw: None)
+    monkeypatch.setattr(appraisal, "should_skip", lambda *a: None)
+    monkeypatch.setattr(appraisal, "normalize_message", lambda value: value)
+    monkeypatch.setattr(appraisal, "run_appraisal", lambda **kwargs: result)
+    anansi.register(SimpleNamespace(llm=object(), register_hook=lambda *a, **k: None))
+    anansi._session_state.update({"session_id": None, "last_msg_norm": None})
+    try:
+        output = anansi.pre_llm_call(session_id="persisted", user_message="status?")
+        assert output is not None
+        return output["context"]
+    finally:
+        anansi._ctx = None
+
+
+def _drive_note_goals(block):
+    """Return the persisted goal names in their rendered note order."""
+    return [
+        line.split("relates to ", 1)[1].split(" — ", 1)[0]
+        for line in block.split("\n")
+        if line.startswith("- drive note:")
+    ]
+
+
+def test_pressure_full_hook_is_bounded_and_invalid_uses_standard(monkeypatch):
+    """Quiet, standard, and firm use only bounded non-flagged drive effects;
+    an invalid value is the byte-compatible standard fallback."""
+    outputs = {
+        pressure: _run_pressure_hook(monkeypatch, pressure)["context"]
+        for pressure in ("quiet", "standard", "firm", "not-a-pressure")
+    }
+    note_counts = {
+        pressure: len([
+            line for line in output.split("\n")
+            if line.startswith("- drive note:")
+        ])
+        for pressure, output in outputs.items()
+    }
+    assert note_counts == {
+        "quiet": 1,
+        "standard": 3,
+        "firm": 3,
+        "not-a-pressure": 3,
+    }
+    assert outputs["quiet"] != outputs["standard"]
+    assert outputs["not-a-pressure"] == outputs["standard"]
+    assert outputs["standard"] == render.render_block(
+        _signals_with_n_goal_notes(3), goals=[], energy_budget=3
+    )
+
+
+
+def test_firm_full_hook_orders_authorized_notes_by_actual_stalled_age(tmp_path, monkeypatch):
+    """Firm makes a visible, bounded ordering choice from persisted ages.
+
+    Confidence prefers ``younger authorized`` in standard mode, while the
+    firm-only authorized cohort must put ``older authorized`` first.  Equal
+    ages keep their input order, and the three-note budget remains intact.
+    """
+    goal_specs = [
+        {"text": "younger authorized", "age_days": 4, "confidence": 0.99,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 3},
+        {"text": "older authorized", "age_days": 8, "confidence": 0.10,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 3},
+        {"text": "equal age first", "age_days": 5, "confidence": 0.50,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 3},
+        {"text": "equal age second", "age_days": 5, "confidence": 0.50,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 3},
+        {"text": "unauthorized high confidence", "age_days": 10, "confidence": 1.0},
+        {"text": "below threshold", "age_days": 12, "confidence": 0.98,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 13},
+    ]
+    goal_signals = [
+        {"relates_to_goal": spec["text"], "confidence": spec["confidence"]}
+        for spec in goal_specs
+    ]
+
+    standard = _run_persisted_pressure_hook(
+        tmp_path / "standard", monkeypatch, "standard", goal_specs, goal_signals
+    )
+    firm = _run_persisted_pressure_hook(
+        tmp_path / "firm", monkeypatch, "firm", goal_specs, goal_signals
+    )
+
+    assert _drive_note_goals(standard) == [
+        "younger authorized", "equal age first", "equal age second"
+    ]
+    assert _drive_note_goals(firm) == [
+        "older authorized", "equal age first", "equal age second"
+    ]
+    assert firm != standard
+    assert len(_drive_note_goals(firm)) == 3
+
+
+def test_firm_keeps_unauthorized_and_below_threshold_notes_on_existing_order(tmp_path, monkeypatch):
+    """Firm promotes only persisted, threshold-satisfied authorization."""
+    goal_specs = [
+        {"text": "authorized younger", "age_days": 4, "confidence": 0.1,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 3},
+        {"text": "unauthorized older", "age_days": 10, "confidence": 0.99},
+        {"text": "below threshold older", "age_days": 12, "confidence": 0.98,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 13},
+    ]
+    goal_signals = [
+        {"relates_to_goal": spec["text"], "confidence": spec["confidence"]}
+        for spec in goal_specs
+    ]
+
+    firm = _run_persisted_pressure_hook(
+        tmp_path, monkeypatch, "firm", goal_specs, goal_signals
+    )
+    assert _drive_note_goals(firm) == [
+        "authorized younger", "unauthorized older", "below threshold older"
+    ]
+
+
+def test_pressure_drive_off_preserves_no_goals_appraisal_block(monkeypatch):
+    """Drive-off strips every drive field and preserves the ordinary appraisal
+    block byte-for-byte against the equivalent no-goals render."""
+    out = _run_pressure_hook(monkeypatch, "firm", drive_enabled=False)
+    expected = render.render_block({
+        "instincts": [],
+        "salient_observations": [
+            {"text": "the topic recurs across sessions", "confidence": 0.9}
+        ],
+        "contradiction_flags": [],
+        "suggested_memory_searches": [],
+        "goal_signals": [],
+        "gut_reaction": "",
+    })
+    assert out == {"context": expected}
+    assert "- drive " not in out["context"]

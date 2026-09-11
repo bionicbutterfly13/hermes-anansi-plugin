@@ -58,7 +58,7 @@ def test_moving_goal_reads_moving(tmp_path):
     _write_git(tmp_path, _NOW.timestamp())
     result = store.goal_momentum({}, repo_root=tmp_path, now=_NOW)
     assert result["momentum"] == "moving"
-    assert result["stalled_days"] is None
+    assert result["stalled_days"] == 0
     assert result["salience"] == store._MOMENTUM_SALIENCE["moving"]
 
 
@@ -273,4 +273,83 @@ def test_enrich_grounds_signal_in_persisted_momentum():
     note = next(l for l in block.split("\n") if l.startswith("- drive note:"))
     assert "stalled 6 days" in note
     assert "push zone" in note
+    assert_no_directive_language(block)
+
+
+def test_goal_text_matching_requires_nonempty_whole_token_subset():
+    assert render._goal_text_matches("ship api", "API work can ship today")
+    assert render._goal_text_matches("SHIP api", "api SHIP")
+    assert not render._goal_text_matches("ship api", "shipping capillary")
+    assert not render._goal_text_matches("", "ship api")
+    assert not render._goal_text_matches(None, "ship api")
+    assert not render._goal_text_matches("ship api", None)
+
+
+def test_enrich_uses_persisted_timing_and_rejects_substring_associations():
+    goals = [
+        {
+            "text": "ship api",
+            "momentum": {"momentum": "moving", "stalled_days": 0},
+        },
+        {
+            "text": "no timing evidence",
+            "momentum": {"momentum": "unknown", "stalled_days": None},
+        },
+    ]
+    signals = [
+        {"relates_to_goal": "API ship", "confidence": 0.9, "stalled_days": 9},
+        {
+            "relates_to_goal": "no timing evidence",
+            "confidence": 0.8,
+            "stalled_days": 7,
+        },
+        {
+            "relates_to_goal": "shipping capillary",
+            "confidence": 0.7,
+            "stalled_days": 6,
+        },
+    ]
+
+    enriched = render.enrich_goal_signals(signals, goals)
+    assert enriched[0]["momentum"] == "moving"
+    assert enriched[0]["stalled_days"] == 0
+    assert "stalled_days" not in enriched[1]
+    assert "momentum" not in enriched[2]
+    assert enriched[2]["stalled_days"] == 6
+
+
+def test_render_orders_flagged_then_stalled_then_fresh_with_stable_ties():
+    goals = [
+        {
+            "text": "fresh flagged",
+            "status": "active",
+            "flagged_priority": 1,
+            "momentum": {"momentum": "moving", "stalled_days": 0},
+        }
+    ]
+    signals = {
+        "goal_signals": [
+            {"relates_to_goal": "fresh one", "confidence": 0.9, "stalled_days": 0},
+            {"relates_to_goal": "stalled one", "confidence": 0.1, "stalled_days": 3},
+            {"relates_to_goal": "stalled two", "confidence": 0.1, "stalled_days": 3},
+            {"relates_to_goal": "fresh flagged", "confidence": 0.2, "stalled_days": 0},
+        ]
+    }
+
+    block = render.render_block(signals, goals=goals)
+    assert block is not None
+    lines = block.split("\n")
+    wants = [line for line in lines if line.startswith("- drive want:")]
+    notes = [line for line in lines if line.startswith("- drive note:")]
+    assert "fresh" in wants[0].lower()
+    assert "stalled" not in wants[0].lower()
+    assert [
+        "stalled one" in line or "stalled two" in line or "fresh one" in line
+        for line in notes
+    ] == [True, True, True]
+    assert "stalled one" in notes[0]
+    assert "stalled two" in notes[1]
+    assert "fresh one" in notes[2]
+    assert "fresh" in notes[2].lower()
+    assert "stalled" not in notes[2].lower()
     assert_no_directive_language(block)

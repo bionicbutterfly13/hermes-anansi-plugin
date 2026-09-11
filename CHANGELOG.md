@@ -1,5 +1,81 @@
 # Changelog
 
+## 2026-09-11 - Non-finite integer configuration boundary
+
+### Fixes
+
+- Kept all five integer configuration keys fail-open for native positive and
+  negative infinity. The root cause was that `int()` raises `OverflowError` for
+  native infinity before configuration degradation descriptors and session
+  telemetry can be created.
+
+### Learnings
+
+- Defensive integer coercion must catch `OverflowError` alongside `TypeError`
+  and `ValueError`; doing so preserves documented defaults and finite bounds
+  without retaining a rejected non-finite literal or claiming live-provider
+  evidence.
+
+## 2026-09-11 - Phase 8 review repairs
+
+### Fixes
+
+- Preserved persisted v5 drive authorization when legacy-shaped goal updates
+  omit the newer pressure fields. The root cause was an unconditional update
+  that treated absent fields as explicit clearing values.
+- Normalized malformed priorities at persistence, snapshot, containment,
+  rendering and retention boundaries. The root cause was inconsistent truthy
+  checks that could exempt ordinary off-domain goals and bypass their cap.
+- Preserved known fresh momentum as zero-day evidence through snapshot and the
+  hook. The root cause was using the unknown sentinel for an observed fresh age.
+- Classified non-finite legacy priorities as ordinary values at every
+  coercion boundary. The root cause was omitting `OverflowError`, which let an
+  infinite SQLite value suppress the complete persisted snapshot and trigger a
+  containment-filter fallback.
+
+### Learnings
+
+- Additive schema fields need presence-aware updates, because a caller using an
+  older payload shape cannot distinguish its omission from consent withdrawal.
+- Priority values are a domain contract: only positive integers carry the
+  never-omit exemption, including when a malformed legacy row is encountered.
+- Unknown timing means the store could not establish evidence; a known moving
+  goal needs explicit zero-day timing so rendering can remain grounded.
+- Numeric coercion must account for non-finite values, since `int(infinity)`
+  raises a distinct `OverflowError` rather than a `ValueError`.
+
+## 2026-09-11 - Phase 8 evidence boundary and regression closure
+
+### Features
+
+- Added an offline regression for the established live-drive smoke command. It
+  forces unavailable network preflight, verifies exit `2` with an
+  `INCONCLUSIVE` result, and fails if the provider import seam is reached.
+- Added the Phase 8 technical live-smoke record. It begins `UNRUN`, names the
+  sole established command and preserves `0` PASS, `1` FAIL and `2`
+  INCONCLUSIVE as distinct evidence states.
+
+### Fixes
+
+- Classified a locked schema migration as unavailable without partial mutation
+  or quarantine. The root cause was treating an unavailable store as a repair
+  opportunity rather than a fail-open condition.
+- Kept configuration-degradation telemetry shape-only, so rejected values do
+  not become a second secret-bearing data path.
+- Carried persisted flagged priorities through storage, filtering and rendering
+  without treating a bounded unflagged list as permission to erase them.
+- Made read-time persisted timing authoritative, preventing model-supplied or
+  stale reflection timing from changing fresh-versus-stalled drive output.
+
+### Learnings
+
+- An offline check can prove that the live lane stops before a provider import;
+  it cannot establish a provider-backed PASS. Only separately authorized
+  exit-0 evidence can do that.
+- Fail-open handling needs consistent classification across migration, config,
+  persistence and rendering. A harmless-looking fallback becomes an integrity
+  bug when it silently changes or hides user state.
+
 ## 2026-09-10 - Retired planning workflow removal
 
 ### Fixes
