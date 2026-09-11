@@ -433,7 +433,7 @@ def test_persisted_flagged_priorities_survive_empty_signal_full_hook(tmp_path, m
         if line.startswith("- drive want:")
     ]
     assert len(wants) == 55
-    assert all("I want progress on protected priority" in line for line in wants)
+    assert all("I want fresh progress on protected priority" in line for line in wants)
     assert "ordinary out-of-domain control" not in output["context"]
     assert "flagged candidate control" not in output["context"]
     assert "flagged retired control" not in output["context"]

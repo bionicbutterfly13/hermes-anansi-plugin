@@ -334,14 +334,14 @@ def _render_drive_note(item) -> str:
 
 def _is_flagged(item) -> bool:
     """True when this goal/goal_signal carries a user-flagged priority
-    (DRIVE-05). Defensive: any truthy flagged_priority reads as flagged."""
+    (DRIVE-05). A priority must coerce to an integer greater than zero."""
     if not isinstance(item, dict):
         return False
     value = item.get("flagged_priority")
     try:
         return int(value) > 0
     except (TypeError, ValueError):
-        return bool(value)
+        return False
 
 
 def _want_text(item) -> str:

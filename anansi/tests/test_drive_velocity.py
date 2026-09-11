@@ -58,7 +58,7 @@ def test_moving_goal_reads_moving(tmp_path):
     _write_git(tmp_path, _NOW.timestamp())
     result = store.goal_momentum({}, repo_root=tmp_path, now=_NOW)
     assert result["momentum"] == "moving"
-    assert result["stalled_days"] is None
+    assert result["stalled_days"] == 0
     assert result["salience"] == store._MOMENTUM_SALIENCE["moving"]
 
 

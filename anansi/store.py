@@ -44,6 +44,16 @@ CAPS = {
     "goals": 50,
 }
 
+
+def _normalize_flagged_priority(value):
+    """Return zero or a positive integer for persisted priority fields."""
+    try:
+        priority = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return priority if priority > 0 else 0
+
+
 _DEFAULT_BUSY_TIMEOUT_MS = 5000
 
 _TABLES = (
@@ -511,7 +521,7 @@ def goal_momentum(goal, repo_root=None, now=None):
             }
         return {
             "momentum": "moving",
-            "stalled_days": None,
+            "stalled_days": 0,
             "salience": _MOMENTUM_SALIENCE["moving"],
         }
     except Exception:
@@ -585,6 +595,10 @@ def read_snapshot(db_path=None, include_decayed=False):
         # break read_snapshot's "None on any error, never raises" contract; on
         # failure goals simply carry the benign 'unknown' default.
         goals = _rows_as_dicts(conn, "goals")
+        for goal in goals:
+            goal["flagged_priority"] = _normalize_flagged_priority(
+                goal.get("flagged_priority")
+            )
         try:
             repo_root = _repo_root()
             for goal in goals:
@@ -675,7 +689,16 @@ def read_turns_since(after_id, db_path=None, limit=50):
 
 
 def _enforce_goal_cap(conn) -> None:
-    """Cap only unflagged rows; persisted flagged priorities are exempt."""
+    """Normalize malformed rows, then cap only ordinary goals."""
+    for goal_id, priority in conn.execute(
+        "SELECT id, flagged_priority FROM goals"
+    ):
+        normalized = _normalize_flagged_priority(priority)
+        if priority != normalized or not isinstance(priority, int):
+            conn.execute(
+                "UPDATE goals SET flagged_priority=? WHERE id=?",
+                (normalized, goal_id),
+            )
     conn.execute(
         "DELETE FROM goals WHERE COALESCE(flagged_priority, 0)=0"
         " AND id NOT IN"
@@ -800,7 +823,9 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                                 item.get("text"),
                                 item.get("status", "candidate"),
                                 item.get("success_criteria"),
-                                item.get("flagged_priority", 0),
+                                _normalize_flagged_priority(
+                                    item.get("flagged_priority", 0)
+                                ),
                                 item.get("domain"),
                                 now,
                                 now,
@@ -810,25 +835,32 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                             ),
                         )
                 elif key == "goals_update":
-                    # Absolute values, pre-validated by the caller.
+                    # Preserve omitted fields for callers using an older goal
+                    # shape. An explicitly present None still clears a field.
                     for item in payload:
+                        assignments = []
+                        values = []
+                        for field in (
+                            "text",
+                            "success_criteria",
+                            "flagged_priority",
+                            "domain",
+                            "support_style",
+                            "push_when_stalled",
+                            "stall_threshold_days",
+                        ):
+                            if field in item:
+                                assignments.append("%s=?" % field)
+                                value = item[field]
+                                if field == "flagged_priority":
+                                    value = _normalize_flagged_priority(value)
+                                values.append(value)
+                        assignments.append("updated_at=?")
+                        values.append(now)
+                        values.append(item.get("id"))
                         conn.execute(
-                            "UPDATE goals SET text=?, success_criteria=?,"
-                            " flagged_priority=?, domain=?, updated_at=?,"
-                            " support_style=?, push_when_stalled=?,"
-                            " stall_threshold_days=?"
-                            " WHERE id=?",
-                            (
-                                item.get("text"),
-                                item.get("success_criteria"),
-                                item.get("flagged_priority", 0),
-                                item.get("domain"),
-                                now,
-                                item.get("support_style"),
-                                item.get("push_when_stalled", 0),
-                                item.get("stall_threshold_days"),
-                                item.get("id"),
-                            ),
+                            "UPDATE goals SET %s WHERE id=?" % ", ".join(assignments),
+                            values,
                         )
                 elif key == "goals_status":
                     # The promotion path candidate->active (and back).

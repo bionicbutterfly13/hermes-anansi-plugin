@@ -31,6 +31,14 @@ _ctx = None
 _session_state = {"session_id": None, "last_msg_norm": None}
 
 
+def _is_positive_priority(goal):
+    """Return whether a goal has a valid user-flagged priority."""
+    try:
+        return int(goal.get("flagged_priority")) > 0
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
 def _filter_goals_by_domain(goals, drive_domains):
     """DRIVE-06 containment: keep only goals whose ``domain`` is in the
     whitelist when the whitelist is NON-empty; an empty whitelist means NO
@@ -49,7 +57,7 @@ def _filter_goals_by_domain(goals, drive_domains):
             return active_goals
         kept = [
             goal for goal in active_goals
-            if goal.get("flagged_priority")
+            if _is_positive_priority(goal)
             or str(goal.get("domain") or "").strip() in allowed
         ]
         return kept

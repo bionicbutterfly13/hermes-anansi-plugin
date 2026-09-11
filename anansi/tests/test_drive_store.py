@@ -424,6 +424,117 @@ def test_goal_cap_preserves_all_flagged_priorities_under_unflagged_pressure(tmp_
     assert "ordinary goal 00" not in goals
 
 
+def test_malformed_priorities_are_ordinary_and_cannot_evade_goal_cap(tmp_path):
+    """Non-positive write inputs and legacy rows are retained as ordinary."""
+    db = tmp_path / "state.db"
+    assert store.ensure_db(db) is True
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {
+                    "text": "negative input",
+                    "status": "active",
+                    "flagged_priority": -1,
+                },
+                {
+                    "text": "string zero input",
+                    "status": "active",
+                    "flagged_priority": "0",
+                },
+                {
+                    "text": "positive priority",
+                    "status": "active",
+                    "flagged_priority": 3,
+                },
+            ]
+        },
+        db,
+    ) is True
+    initial = {goal["text"]: goal for goal in store.read_snapshot(db)["goals"]}
+    assert initial["negative input"]["flagged_priority"] == 0
+    assert initial["string zero input"]["flagged_priority"] == 0
+    assert initial["positive priority"]["flagged_priority"] == 3
+
+    now = datetime.now(timezone.utc).isoformat()
+    conn = sqlite3.connect(str(db))
+    try:
+        with conn:
+            conn.executemany(
+                "INSERT INTO goals "
+                "(text, status, flagged_priority, created_at, updated_at) "
+                "VALUES (?, 'active', -1, ?, ?)",
+                [
+                    ("legacy negative %02d" % index, now, now)
+                    for index in range(55)
+                ],
+            )
+    finally:
+        conn.close()
+
+    assert store.apply_deltas({}, db) is True
+    snapshot = store.read_snapshot(db)
+    assert snapshot is not None
+    goals = {goal["text"]: goal for goal in snapshot["goals"]}
+    assert goals["positive priority"]["flagged_priority"] == 3
+    ordinary = [goal for goal in goals.values() if goal["flagged_priority"] == 0]
+    assert len(ordinary) == 50
+    assert all(goal["flagged_priority"] >= 0 for goal in goals.values())
+    conn = sqlite3.connect(str(db))
+    try:
+        priorities = {
+            row[0]
+            for row in conn.execute("SELECT DISTINCT flagged_priority FROM goals")
+        }
+    finally:
+        conn.close()
+    assert priorities <= {0, 3}
+
+
+def test_legacy_goal_update_preserves_v5_drive_fields(tmp_path):
+    """A v4-shaped update cannot silently remove persisted drive consent."""
+    db = tmp_path / "state.db"
+    assert store.ensure_db(db) is True
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {
+                    "text": "ship safely",
+                    "status": "active",
+                    "success_criteria": "green suite",
+                    "flagged_priority": 1,
+                    "domain": "anansi",
+                    "support_style": "firm",
+                    "push_when_stalled": 1,
+                    "stall_threshold_days": 3,
+                }
+            ]
+        },
+        db,
+    ) is True
+    original = store.read_snapshot(db)["goals"][0]
+
+    assert store.apply_deltas(
+        {
+            "goals_update": [
+                {
+                    "id": original["id"],
+                    "text": "ship safely soon",
+                    "success_criteria": "green suite",
+                    "flagged_priority": 1,
+                    "domain": "anansi",
+                }
+            ]
+        },
+        db,
+    ) is True
+
+    updated = store.read_snapshot(db)["goals"][0]
+    assert updated["text"] == "ship safely soon"
+    assert updated["support_style"] == "firm"
+    assert updated["push_when_stalled"] == 1
+    assert updated["stall_threshold_days"] == 3
+
+
 def test_locked_db_goal_write_returns_false(tmp_path):
     """DRIVE-01 fail-open: a goals_add against a write-locked DB returns False
     and degrades fast — mirrors test_locked_db_write_degrades."""
