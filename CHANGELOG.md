@@ -10,6 +10,8 @@
 - Normalized malformed priorities at persistence, snapshot, containment,
   rendering and retention boundaries. The root cause was inconsistent truthy
   checks that could exempt ordinary off-domain goals and bypass their cap.
+- Preserved known fresh momentum as zero-day evidence through snapshot and the
+  hook. The root cause was using the unknown sentinel for an observed fresh age.
 
 ### Learnings
 
@@ -17,6 +19,8 @@
   older payload shape cannot distinguish its omission from consent withdrawal.
 - Priority values are a domain contract: only positive integers carry the
   never-omit exemption, including when a malformed legacy row is encountered.
+- Unknown timing means the store could not establish evidence; a known moving
+  goal needs explicit zero-day timing so rendering can remain grounded.
 
 ## 2026-09-11 - Phase 8 evidence boundary and regression closure
 

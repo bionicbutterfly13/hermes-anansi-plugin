@@ -689,6 +689,47 @@ def test_domain_whitelist_only_exempts_positive_priorities(pinned_env):
     assert "positive private priority" in prompt
 
 
+def test_fresh_persisted_goal_reaches_hook_with_zero_day_evidence(
+    pinned_env, monkeypatch
+):
+    """A current persisted timestamp remains fresh through snapshot and render."""
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {
+                    "text": "current implementation work",
+                    "status": "active",
+                    "domain": "anansi",
+                }
+            ]
+        },
+        pinned_env.db_path,
+    ) is True
+    monkeypatch.setattr(store, "_repo_root", lambda: None)
+
+    snapshot = store.read_snapshot(pinned_env.db_path)
+    assert snapshot is not None
+    momentum = snapshot["goals"][0]["momentum"]
+    assert momentum["momentum"] == "moving"
+    assert momentum["stalled_days"] == 0
+
+    payload = dict(RICH_PAYLOAD)
+    payload["goal_signals"] = [
+        {"relates_to_goal": "current implementation work", "confidence": 0.9}
+    ]
+    pinned_env.state["caller"] = _CountingCaller(payload)
+    out = anansi.pre_llm_call(
+        session_id="fresh-persisted", user_message="status?"
+    )
+    assert isinstance(out, dict) and out["context"].startswith("[anansi appraisal]")
+    note = next(
+        line for line in out["context"].split("\n")
+        if line.startswith("- drive note:")
+    )
+    assert "fresh activity" in note
+    assert "stalled" not in note
+
+
 def test_drive_budget_cap_full_hook(pinned_env):
     """drive_energy_budget=1 with multiple non-flagged goal_signals: at most one
     `- drive note:` line surfaces in the returned block; a flagged goal (seeded

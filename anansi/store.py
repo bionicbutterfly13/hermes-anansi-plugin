@@ -521,7 +521,7 @@ def goal_momentum(goal, repo_root=None, now=None):
             }
         return {
             "momentum": "moving",
-            "stalled_days": None,
+            "stalled_days": 0,
             "salience": _MOMENTUM_SALIENCE["moving"],
         }
     except Exception:
