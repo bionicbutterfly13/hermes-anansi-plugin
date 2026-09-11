@@ -445,6 +445,86 @@ def test_drive_disabled_is_non_failure(pinned_env):
     assert summary["by_outcome"].get("skipped:drive_disabled") == 1
 
 
+def test_session_start_emits_one_secret_safe_config_row_per_degradation(
+    matrix_env, monkeypatch
+):
+    secret = "sk-rejected-config-value-should-never-persist"
+    invalid_parse = "not-a-number"
+    raw_domain = "infrastructure"
+    monkeypatch.setattr(
+        config,
+        "_load_host_entry",
+        lambda: {
+            "deadline_seconds": 99,
+            "reflect_deadline_seconds": 0.1,
+            "confidence_threshold": invalid_parse,
+            "drive_domains": [raw_domain, " "],
+            "drive_pressure": secret,
+        },
+    )
+
+    assert anansi.on_session_start(session_id="degraded") is None
+    conn = sqlite3.connect("file:%s?mode=ro" % matrix_env.db_path, uri=True)
+    try:
+        rows = conn.execute(
+            "SELECT error FROM telemetry WHERE outcome='config_degraded' ORDER BY id"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    assert rows == [
+        ("confidence_threshold: rejected <str len=%d>, applied 0.6" % len(invalid_parse),),
+        ("deadline_seconds: rejected <int>, applied 10.0",),
+        ("reflect_deadline_seconds: rejected <float>, applied 0.5",),
+        ("drive_domains: rejected <list len=2>, applied <list len=1>",),
+        ("drive_pressure: rejected <str len=%d>, applied 'standard'" % len(secret),),
+    ]
+    assert all(raw not in row[0] for raw in (secret, invalid_parse, raw_domain) for row in rows)
+
+
+def test_session_start_valid_config_emits_no_degradation_rows(matrix_env, monkeypatch):
+    monkeypatch.setattr(
+        config,
+        "_load_host_entry",
+        lambda: {"deadline_seconds": " 8 ", "drive_pressure": " FIRM "},
+    )
+
+    assert anansi.on_session_start(session_id="valid") is None
+
+    assert "config_degraded" not in [row[0] for row in _telemetry_rows(matrix_env.db_path)]
+
+
+@pytest.mark.parametrize("failure", [False, RuntimeError("telemetry unavailable")])
+def test_unavailable_config_telemetry_does_not_change_next_hook_output(
+    matrix_env, monkeypatch, failure
+):
+    """A lost diagnostic never alters the next ordinary appraisal injection."""
+    monkeypatch.setattr(
+        config, "_load_host_entry", lambda: {"drive_pressure": "invalid"}
+    )
+    message = "how is the migration going?"
+
+    assert anansi.on_session_start(session_id="control") is None
+    control = anansi.pre_llm_call(session_id="control", user_message=message)
+
+    config.reset_cache()
+    anansi._session_state.update({"session_id": None, "last_msg_norm": None})
+    original_record = store.record_telemetry
+
+    def unavailable_record(outcome, *args, **kwargs):
+        if outcome == "config_degraded":
+            if failure is False:
+                return False
+            raise failure
+        return original_record(outcome, *args, **kwargs)
+
+    monkeypatch.setattr(store, "record_telemetry", unavailable_record)
+    assert anansi.on_session_start(session_id="unavailable") is None
+    actual = anansi.pre_llm_call(session_id="unavailable", user_message=message)
+
+    assert actual == control
+
+
 # ---------------------------------------------------------------------------
 # DRIVE-02: read-time velocity fail-open rows (07-02). Absent/corrupt .git,
 # an unparseable reflog, and a bad timestamp ALL degrade to 'unknown'

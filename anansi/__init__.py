@@ -82,6 +82,19 @@ def _filter_signals_by_goals(goal_signals, goals, drive_domains):
         return goal_signals
 
 
+def _config_degradation_error(key, shape, applied_default):
+    """Format a config diagnostic without rendering a rejected value."""
+    if isinstance(applied_default, str) and applied_default.startswith("<") and applied_default.endswith(">"):
+        applied = applied_default
+    elif isinstance(applied_default, (str, int, float, bool)) or applied_default is None:
+        applied = repr(applied_default)
+    elif isinstance(applied_default, (list, tuple, dict)):
+        applied = "<%s len=%d>" % (type(applied_default).__name__, len(applied_default))
+    else:
+        applied = "<%s>" % type(applied_default).__name__
+    return "%s: rejected %s, applied %s" % (key, shape, applied)
+
+
 def _fail_open(fn):
     """Wrap a hook so any exception is logged and swallowed (returns None).
 
@@ -134,6 +147,24 @@ def on_session_start(session_id="", platform="", **kwargs):
 
     if not store.ensure_db():
         logger.debug("anansi state store unavailable — continuing without state")
+
+    # Diagnostics have their own fail-open boundary. A lost observation cannot
+    # change reflection or the next appraisal hook's output.
+    try:
+        config.get_cfg()
+        for key, shape, applied_default in config.get_degradations():
+            try:
+                store.record_telemetry(
+                    "config_degraded",
+                    error=_config_degradation_error(key, shape, applied_default),
+                    session_id=session_id,
+                )
+            except Exception:
+                logger.debug(
+                    "anansi config-degradation telemetry unavailable", exc_info=True
+                )
+    except Exception:
+        logger.debug("anansi config-degradation telemetry skipped", exc_info=True)
 
     llm = getattr(_ctx, "llm", None) if _ctx is not None else None
     reflection.maybe_reflect(llm=llm, session_id=session_id)

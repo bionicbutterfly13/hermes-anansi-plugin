@@ -87,6 +87,100 @@ def test_drive_pressure_coerced(monkeypatch):
         assert config.get_cfg(force_reload=True)["drive_pressure"] == "standard"
 
 
+def test_config_degradations_are_shape_only_and_once_per_key(monkeypatch):
+    """Every rejected or clamped provided key has one secret-safe descriptor."""
+    rejected_secret = "sk-rejected-config-value-should-never-persist"
+    entry = {
+        "enabled": "maybe",
+        "confidence_threshold": "not-a-number",
+        "deadline_seconds": 999,
+        "history_chars": -1,
+        "max_tokens": 0,
+        "reflection_enabled": None,
+        "reflect_every_n_turns": 99,
+        "reflect_max_tokens": 0,
+        "reflect_deadline_seconds": 0.1,
+        "drive_enabled": {},
+        "drive_domains": ["allowed", "  "],
+        "drive_energy_budget": -1,
+        "drive_pressure": rejected_secret,
+        "llm": {"model": "  "},
+    }
+    monkeypatch.setattr(config, "_load_host_entry", lambda: entry)
+
+    config.get_cfg(force_reload=True)
+    degradations = config.get_degradations()
+
+    assert {record[0] for record in degradations} == {
+        "enabled", "confidence_threshold", "deadline_seconds", "history_chars",
+        "max_tokens", "reflection_enabled", "reflect_every_n_turns",
+        "reflect_max_tokens", "reflect_deadline_seconds", "drive_enabled",
+        "drive_domains", "drive_energy_budget", "drive_pressure", "model",
+    }
+    assert len(degradations) == 14
+    assert all(len(record) == 3 for record in degradations)
+    assert all(rejected_secret not in repr(record) for record in degradations)
+    assert all(record[1].startswith("<") for record in degradations)
+
+
+def test_config_degradations_describe_effective_values_without_raw_inputs(monkeypatch):
+    """Descriptors retain only each key's applied effective value or shape."""
+    invalid_parse = "not-a-number"
+    raw_domain = "infrastructure"
+    entry = {
+        "confidence_threshold": invalid_parse,
+        "deadline_seconds": 999,
+        "reflect_deadline_seconds": 0.1,
+        "drive_domains": [raw_domain, " "],
+    }
+    monkeypatch.setattr(config, "_load_host_entry", lambda: entry)
+
+    cfg = config.get_cfg(force_reload=True)
+    degradations = dict((key, (shape, applied)) for key, shape, applied in config.get_degradations())
+
+    assert cfg["confidence_threshold"] == config.DEFAULT_CONFIDENCE_THRESHOLD
+    assert cfg["deadline_seconds"] == 10.0
+    assert cfg["reflect_deadline_seconds"] == 0.5
+    assert cfg["drive_domains"] == [raw_domain]
+    assert degradations["confidence_threshold"] == ("<str len=%d>" % len(invalid_parse), 0.6)
+    assert degradations["deadline_seconds"] == ("<int>", 10.0)
+    assert degradations["reflect_deadline_seconds"] == ("<float>", 0.5)
+    assert degradations["drive_domains"] == ("<list len=2>", "<list len=1>")
+    assert invalid_parse not in repr(degradations)
+    assert raw_domain not in repr(degradations)
+
+
+def test_config_degradations_ignore_normalization_and_cached_reads(monkeypatch):
+    """Valid normalization is not degradation, and cache hits do not duplicate it."""
+    entry = {
+        "enabled": " YES ",
+        "confidence_threshold": "0.75",
+        "deadline_seconds": " 8 ",
+        "history_chars": "4000",
+        "max_tokens": "700",
+        "reflection_enabled": "off",
+        "reflect_every_n_turns": "5",
+        "reflect_max_tokens": "700",
+        "reflect_deadline_seconds": "8.0",
+        "drive_enabled": 1,
+        "drive_domains": ["  project-a  ", 7],
+        "drive_energy_budget": "3",
+        "drive_pressure": " FIRM ",
+        "llm": {"model": " model-name "},
+    }
+    monkeypatch.setattr(config, "_load_host_entry", lambda: entry)
+
+    first = config.get_cfg(force_reload=True)
+    first_degradations = config.get_degradations()
+    second = config.get_cfg()
+
+    assert first == second
+    assert first_degradations == []
+    assert config.get_degradations() == []
+    config.reset_cache()
+    assert config.get_degradations() == []
+
+
 # ---------------------------------------------------------------------------
 # Domain whitelist — off-domain goals do not surface (build_context + render)
 # ---------------------------------------------------------------------------
