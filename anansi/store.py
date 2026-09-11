@@ -810,25 +810,29 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                             ),
                         )
                 elif key == "goals_update":
-                    # Absolute values, pre-validated by the caller.
+                    # Preserve omitted fields for callers using an older goal
+                    # shape. An explicitly present None still clears a field.
                     for item in payload:
+                        assignments = []
+                        values = []
+                        for field in (
+                            "text",
+                            "success_criteria",
+                            "flagged_priority",
+                            "domain",
+                            "support_style",
+                            "push_when_stalled",
+                            "stall_threshold_days",
+                        ):
+                            if field in item:
+                                assignments.append("%s=?" % field)
+                                values.append(item[field])
+                        assignments.append("updated_at=?")
+                        values.append(now)
+                        values.append(item.get("id"))
                         conn.execute(
-                            "UPDATE goals SET text=?, success_criteria=?,"
-                            " flagged_priority=?, domain=?, updated_at=?,"
-                            " support_style=?, push_when_stalled=?,"
-                            " stall_threshold_days=?"
-                            " WHERE id=?",
-                            (
-                                item.get("text"),
-                                item.get("success_criteria"),
-                                item.get("flagged_priority", 0),
-                                item.get("domain"),
-                                now,
-                                item.get("support_style"),
-                                item.get("push_when_stalled", 0),
-                                item.get("stall_threshold_days"),
-                                item.get("id"),
-                            ),
+                            "UPDATE goals SET %s WHERE id=?" % ", ".join(assignments),
+                            values,
                         )
                 elif key == "goals_status":
                     # The promotion path candidate->active (and back).

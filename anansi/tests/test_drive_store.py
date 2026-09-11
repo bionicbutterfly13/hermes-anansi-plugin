@@ -424,6 +424,51 @@ def test_goal_cap_preserves_all_flagged_priorities_under_unflagged_pressure(tmp_
     assert "ordinary goal 00" not in goals
 
 
+def test_legacy_goal_update_preserves_v5_drive_fields(tmp_path):
+    """A v4-shaped update cannot silently remove persisted drive consent."""
+    db = tmp_path / "state.db"
+    assert store.ensure_db(db) is True
+    assert store.apply_deltas(
+        {
+            "goals_add": [
+                {
+                    "text": "ship safely",
+                    "status": "active",
+                    "success_criteria": "green suite",
+                    "flagged_priority": 1,
+                    "domain": "anansi",
+                    "support_style": "firm",
+                    "push_when_stalled": 1,
+                    "stall_threshold_days": 3,
+                }
+            ]
+        },
+        db,
+    ) is True
+    original = store.read_snapshot(db)["goals"][0]
+
+    assert store.apply_deltas(
+        {
+            "goals_update": [
+                {
+                    "id": original["id"],
+                    "text": "ship safely soon",
+                    "success_criteria": "green suite",
+                    "flagged_priority": 1,
+                    "domain": "anansi",
+                }
+            ]
+        },
+        db,
+    ) is True
+
+    updated = store.read_snapshot(db)["goals"][0]
+    assert updated["text"] == "ship safely soon"
+    assert updated["support_style"] == "firm"
+    assert updated["push_when_stalled"] == 1
+    assert updated["stall_threshold_days"] == 3
+
+
 def test_locked_db_goal_write_returns_false(tmp_path):
     """DRIVE-01 fail-open: a goals_add against a write-locked DB returns False
     and degrades fast — mirrors test_locked_db_write_degrades."""

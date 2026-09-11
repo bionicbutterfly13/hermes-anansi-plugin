@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-09-11 - Phase 8 review repairs
+
+### Fixes
+
+- Preserved persisted v5 drive authorization when legacy-shaped goal updates
+  omit the newer pressure fields. The root cause was an unconditional update
+  that treated absent fields as explicit clearing values.
+
+### Learnings
+
+- Additive schema fields need presence-aware updates, because a caller using an
+  older payload shape cannot distinguish its omission from consent withdrawal.
+
 ## 2026-09-11 - Phase 8 evidence boundary and regression closure
 
 ### Features
