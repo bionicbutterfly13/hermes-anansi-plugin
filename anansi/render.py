@@ -145,7 +145,7 @@ def _drive_salience(item) -> float:
     momentum = "stalled" if isinstance(stalled_days, int) else item.get("momentum")
     rank = _MOMENTUM_RANK.get(momentum, 0)
     bonus = 0
-    if rank >= _MOMENTUM_RANK["stalled"] and _push_when_stalled(item):
+    if rank >= _MOMENTUM_RANK["stalled"] and _pressure_effect_active(item):
         bonus = _PUSH_SALIENCE_BONUS
     try:
         confidence = float(item.get("confidence") or 0.0)
@@ -166,6 +166,22 @@ def _push_when_stalled(item) -> bool:
         return True
     style = str(item.get("support_style", "") or "").strip().lower()
     return style in ("firm", "push", "firmer")
+
+
+def _pressure_effect_active(item) -> bool:
+    """True only when a persisted setting is authorized at the stalled age."""
+    if not _push_when_stalled(item):
+        return False
+    days = _resolve_stalled_days(item)
+    if not isinstance(days, int):
+        return False
+    try:
+        threshold = int(item.get("stall_threshold_days"))
+    except (TypeError, ValueError):
+        threshold = None
+    if isinstance(threshold, int) and threshold > 0:
+        return days >= threshold
+    return True  # legacy NULL or invalid threshold retains the prior behavior
 
 
 def enrich_goal_signals(goal_signals, goals):
@@ -202,18 +218,15 @@ def enrich_goal_signals(goal_signals, goals):
                 continue
             sig["momentum"] = momentum.get("momentum")
             days = momentum.get("stalled_days")
-            # Only attach the neutral stalled_days when the goal actually reads
-            # stalled (moving/unknown carry no days clause). Don't overwrite a
-            # model-supplied value with None.
+            # Read-time persisted momentum is authoritative over model metadata.
             if isinstance(days, int) and "stalled_days" not in sig:
                 sig["stalled_days"] = days
             # User-authorized pressure metadata (kept separate from the
             # neutral momentum above) — copied through for ordering + the
             # inspectable drive-effect clause.
-            if match.get("support_style") is not None:
-                sig["support_style"] = match.get("support_style")
-            if match.get("push_when_stalled") is not None:
-                sig["push_when_stalled"] = match.get("push_when_stalled")
+            sig["support_style"] = match.get("support_style")
+            sig["push_when_stalled"] = match.get("push_when_stalled")
+            sig["stall_threshold_days"] = match.get("stall_threshold_days")
             # DRIVE-05: carry the user-flagged priority through so a matching
             # signal is recognized as flagged. (The never-omit guarantee in
             # render_block reads the PERSISTED goals directly, so a flagged
@@ -245,7 +258,7 @@ def _render_drive_note(item) -> str:
     parts = ["relates to %s" % relates]
     if isinstance(stalled_days, int):
         parts.append("stalled %d days" % stalled_days)
-        if _push_when_stalled(item):
+        if _pressure_effect_active(item):
             # The drive effect, rendered SEPARATELY so it is inspectable —
             # observational tag, not an instruction.
             parts.append("[push zone: user-authorized firmer support]")
@@ -313,7 +326,7 @@ def _render_drive_want(item) -> str:
     clause = "I want progress on %s" % want
     if isinstance(stalled_days, int):
         clause = "I want %s moving (stalled %d days)" % (want, stalled_days)
-        if _push_when_stalled(item):
+        if _pressure_effect_active(item):
             # The drive effect is rendered as a SEPARATE, visible clause: a
             # stalled user-authorized push goal must never be quietly rendered
             # as low pressure (anti-complacency). Observational tag, first
@@ -363,7 +376,7 @@ def _flagged_want_lines(goal_signals, goals):
 
 
 def render_block(signals, snapshot=None, goals=None,
-                 energy_budget=None) -> Optional[str]:
+                 energy_budget=None, pressure=None) -> Optional[str]:
     """Render the sanitized [anansi appraisal] block, or None (APPR-04/05).
 
     Top-3 per category, observational phrasing, every interpolated text

@@ -251,9 +251,10 @@ def pre_llm_call(session_id="", task_id="", turn_id="", user_message="",
     # render_block, after the protected flagged prefix is assembled, so a
     # flagged want is never dropped to satisfy the budget. None ⇒ no cap.
     energy_budget = cfg.get("drive_energy_budget") if drive_on else None
+    pressure = cfg.get("drive_pressure") if drive_on else None
     block = render.render_block(
         result.signals, snapshot=snapshot, goals=goals,
-        energy_budget=energy_budget,
+        energy_budget=energy_budget, pressure=pressure,
     )
     if block is None:  # empty-signal suppression (APPR-05)
         return None
