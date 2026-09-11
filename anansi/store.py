@@ -32,7 +32,7 @@ from pathlib import Path
 
 logger = logging.getLogger("hermes.plugins.anansi.store")
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # Per-table row caps (seed values; tune later with telemetry).
 CAPS = {
@@ -100,7 +100,16 @@ _SCHEMA_DDL = (
                                      status TEXT NOT NULL DEFAULT 'candidate'
                                      CHECK (status IN ('active','queued','backburner','candidate')),
                                      success_criteria TEXT, flagged_priority INTEGER NOT NULL DEFAULT 0,
-                                     domain TEXT, created_at TEXT, updated_at TEXT)""",
+                                     domain TEXT, created_at TEXT, updated_at TEXT,
+                                     support_style TEXT,
+                                     push_when_stalled INTEGER NOT NULL DEFAULT 0,
+                                     stall_threshold_days INTEGER)""",
+)
+
+_GOALS_V5_ADDED_COLUMNS = (
+    "support_style TEXT",
+    "push_when_stalled INTEGER NOT NULL DEFAULT 0",
+    "stall_threshold_days INTEGER",
 )
 
 
@@ -225,12 +234,59 @@ def _create_fresh(path: Path) -> bool:
                 pass
 
 
+def _try_upgrade_v4_to_v5(path: Path):
+    """Return True for an upgraded DB, None when temporarily unavailable.
+
+    ``False`` means a structural problem that follows the existing recovery
+    path. A lock is never structural corruption and must not quarantine state.
+    """
+    conn = None
+    try:
+        conn = sqlite3.connect(str(path))
+        conn.execute("PRAGMA busy_timeout=%d" % _DEFAULT_BUSY_TIMEOUT_MS)
+        row = conn.execute("PRAGMA quick_check").fetchone()
+        if row is None or row[0] != "ok":
+            return False
+        tables = {
+            row[0]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        if not set(_TABLES) <= tables:
+            return False
+        row = conn.execute(
+            "SELECT value FROM meta WHERE key='schema_version'"
+        ).fetchone()
+        if row is None or str(row[0]) != "4":
+            return False
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(goals)")}
+        with conn:
+            for definition in _GOALS_V5_ADDED_COLUMNS:
+                if definition.split()[0] not in existing:
+                    conn.execute("ALTER TABLE goals ADD COLUMN %s" % definition)
+            conn.execute(
+                "UPDATE meta SET value=? WHERE key='schema_version'",
+                (str(SCHEMA_VERSION),),
+            )
+    except sqlite3.OperationalError as exc:
+        if any(word in str(exc).lower() for word in ("locked", "busy", "unable to open")):
+            return None
+        return False
+    except Exception:
+        return False
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return _verify_structure(path)
+
+
 def ensure_db(db_path=None) -> bool:
     """Create the DB + schema if absent; verify structure if present.
 
-    ANY structural failure (corrupt file, bad quick_check, missing table,
-    schema_version mismatch) -> quarantine then recreate fresh. Returns True
-    if a usable DB exists at exit, False otherwise. Never raises.
+    A sound v4 database upgrades additively. A transient lock returns False
+    unchanged; remaining structural failures quarantine and recreate fresh.
     """
     try:
         path = Path(db_path) if db_path is not None else get_db_path()
@@ -238,6 +294,11 @@ def ensure_db(db_path=None) -> bool:
         if path.exists():
             if _verify_structure(path):
                 return True
+            upgraded = _try_upgrade_v4_to_v5(path)
+            if upgraded is True:
+                return True
+            if upgraded is None:
+                return False
             _quarantine(path)
         return _create_fresh(path)
     except Exception as exc:
@@ -721,8 +782,9 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                         conn.execute(
                             "INSERT INTO goals"
                             " (text, status, success_criteria, flagged_priority,"
-                            " domain, created_at, updated_at)"
-                            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            " domain, created_at, updated_at, support_style,"
+                            " push_when_stalled, stall_threshold_days)"
+                            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (
                                 item.get("text"),
                                 item.get("status", "candidate"),
@@ -731,6 +793,9 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                                 item.get("domain"),
                                 now,
                                 now,
+                                item.get("support_style"),
+                                item.get("push_when_stalled", 0),
+                                item.get("stall_threshold_days"),
                             ),
                         )
                 elif key == "goals_update":
@@ -738,7 +803,9 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                     for item in payload:
                         conn.execute(
                             "UPDATE goals SET text=?, success_criteria=?,"
-                            " flagged_priority=?, domain=?, updated_at=?"
+                            " flagged_priority=?, domain=?, updated_at=?,"
+                            " support_style=?, push_when_stalled=?,"
+                            " stall_threshold_days=?"
                             " WHERE id=?",
                             (
                                 item.get("text"),
@@ -746,6 +813,9 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
                                 item.get("flagged_priority", 0),
                                 item.get("domain"),
                                 now,
+                                item.get("support_style"),
+                                item.get("push_when_stalled", 0),
+                                item.get("stall_threshold_days"),
                                 item.get("id"),
                             ),
                         )

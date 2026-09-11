@@ -14,6 +14,11 @@ build_context / render_block directly or a tmp DB — the real $HERMES_HOME is
 never touched.
 """
 
+import os
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+
+import anansi
 from anansi import appraisal, config, render, store
 
 
@@ -229,3 +234,219 @@ def test_budget_malformed_falls_back_to_top3():
     assert block is not None
     note_lines = [ln for ln in block.split("\n") if ln.startswith("- drive note:")]
     assert len(note_lines) == 3
+
+
+# ---------------------------------------------------------------------------
+# Global pressure policy — full-hook drive effects stay bounded and fail-open
+# ---------------------------------------------------------------------------
+
+
+def _run_pressure_hook(monkeypatch, pressure, drive_enabled=True):
+    """Exercise the hook with deterministic appraisal output and no live I/O."""
+    signals = _signals_with_n_goal_notes(3)
+    result = SimpleNamespace(
+        signals=signals, outcome="ok", wall_ms=0, model="fake", tokens_in=0,
+        tokens_out=0, error=None,
+    )
+    monkeypatch.setattr(config, "get_cfg", lambda: {
+        "enabled": True,
+        "drive_enabled": drive_enabled,
+        "drive_domains": [],
+        "drive_energy_budget": 3,
+        "drive_pressure": pressure,
+    })
+    monkeypatch.setattr(store, "read_snapshot", lambda: {"goals": []})
+    monkeypatch.setattr(store, "record_telemetry", lambda *a, **kw: None)
+    monkeypatch.setattr(appraisal, "should_skip", lambda *a: None)
+    monkeypatch.setattr(appraisal, "normalize_message", lambda value: value)
+    monkeypatch.setattr(appraisal, "run_appraisal", lambda **kwargs: result)
+    anansi.register(SimpleNamespace(llm=object(), register_hook=lambda *a, **k: None))
+    anansi._session_state.update({"session_id": None, "last_msg_norm": None})
+    try:
+        return anansi.pre_llm_call(session_id="pressure", user_message="status?")
+    finally:
+        anansi._ctx = None
+
+
+def _run_persisted_pressure_hook(
+    tmp_path, monkeypatch, pressure, goal_specs, goal_signals, energy_budget=3
+):
+    """Run a real temporary store through the hook with deterministic signals.
+
+    ``goal_specs`` supplies ``text``, pressure fields, confidence, and an
+    actual file age.  The hook reads its snapshot itself; only the appraisal
+    result is faked, so goal ordering still travels through apply_deltas,
+    read_snapshot, read-time momentum, enrichment, and rendering.
+    """
+    db = tmp_path / "state.db"
+    repo = tmp_path / "repo"
+    repo.mkdir(parents=True)
+    now = datetime.now(timezone.utc)
+    goals = []
+    for index, spec in enumerate(goal_specs):
+        domain = "goal-%d.txt" % index
+        path = repo / domain
+        path.write_text(spec["text"], encoding="utf-8")
+        aged_at = (now - timedelta(days=spec["age_days"])).timestamp()
+        os.utime(path, (aged_at, aged_at))
+        goal = dict(spec)
+        goal.pop("age_days")
+        goal.pop("confidence")
+        goal["status"] = "active"
+        goal["domain"] = domain
+        goals.append(goal)
+
+    assert store.ensure_db(db) is True
+    assert store.apply_deltas({"goals_add": goals}, db) is True
+    monkeypatch.setattr(store, "get_db_path", lambda: db)
+    monkeypatch.setattr(store, "_repo_root", lambda: repo)
+    monkeypatch.setattr(config, "get_cfg", lambda: {
+        "enabled": True,
+        "drive_enabled": True,
+        "drive_domains": [],
+        "drive_energy_budget": energy_budget,
+        "drive_pressure": pressure,
+    })
+    result = SimpleNamespace(
+        signals={
+            "instincts": [],
+            "salient_observations": [{"text": "same state", "confidence": 0.9}],
+            "contradiction_flags": [],
+            "suggested_memory_searches": [],
+            "goal_signals": goal_signals,
+            "gut_reaction": "",
+        },
+        outcome="ok", wall_ms=0, model="fake", tokens_in=0,
+        tokens_out=0, error=None,
+    )
+    monkeypatch.setattr(store, "record_telemetry", lambda *a, **kw: None)
+    monkeypatch.setattr(appraisal, "should_skip", lambda *a: None)
+    monkeypatch.setattr(appraisal, "normalize_message", lambda value: value)
+    monkeypatch.setattr(appraisal, "run_appraisal", lambda **kwargs: result)
+    anansi.register(SimpleNamespace(llm=object(), register_hook=lambda *a, **k: None))
+    anansi._session_state.update({"session_id": None, "last_msg_norm": None})
+    try:
+        output = anansi.pre_llm_call(session_id="persisted", user_message="status?")
+        assert output is not None
+        return output["context"]
+    finally:
+        anansi._ctx = None
+
+
+def _drive_note_goals(block):
+    """Return the persisted goal names in their rendered note order."""
+    return [
+        line.split("relates to ", 1)[1].split(" — ", 1)[0]
+        for line in block.split("\n")
+        if line.startswith("- drive note:")
+    ]
+
+
+def test_pressure_full_hook_is_bounded_and_invalid_uses_standard(monkeypatch):
+    """Quiet, standard, and firm use only bounded non-flagged drive effects;
+    an invalid value is the byte-compatible standard fallback."""
+    outputs = {
+        pressure: _run_pressure_hook(monkeypatch, pressure)["context"]
+        for pressure in ("quiet", "standard", "firm", "not-a-pressure")
+    }
+    note_counts = {
+        pressure: len([
+            line for line in output.split("\n")
+            if line.startswith("- drive note:")
+        ])
+        for pressure, output in outputs.items()
+    }
+    assert note_counts == {
+        "quiet": 1,
+        "standard": 3,
+        "firm": 3,
+        "not-a-pressure": 3,
+    }
+    assert outputs["quiet"] != outputs["standard"]
+    assert outputs["not-a-pressure"] == outputs["standard"]
+    assert outputs["standard"] == render.render_block(
+        _signals_with_n_goal_notes(3), goals=[], energy_budget=3
+    )
+
+
+
+def test_firm_full_hook_orders_authorized_notes_by_actual_stalled_age(tmp_path, monkeypatch):
+    """Firm makes a visible, bounded ordering choice from persisted ages.
+
+    Confidence prefers ``younger authorized`` in standard mode, while the
+    firm-only authorized cohort must put ``older authorized`` first.  Equal
+    ages keep their input order, and the three-note budget remains intact.
+    """
+    goal_specs = [
+        {"text": "younger authorized", "age_days": 4, "confidence": 0.99,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 3},
+        {"text": "older authorized", "age_days": 8, "confidence": 0.10,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 3},
+        {"text": "equal age first", "age_days": 5, "confidence": 0.50,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 3},
+        {"text": "equal age second", "age_days": 5, "confidence": 0.50,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 3},
+        {"text": "unauthorized high confidence", "age_days": 10, "confidence": 1.0},
+        {"text": "below threshold", "age_days": 12, "confidence": 0.98,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 13},
+    ]
+    goal_signals = [
+        {"relates_to_goal": spec["text"], "confidence": spec["confidence"]}
+        for spec in goal_specs
+    ]
+
+    standard = _run_persisted_pressure_hook(
+        tmp_path / "standard", monkeypatch, "standard", goal_specs, goal_signals
+    )
+    firm = _run_persisted_pressure_hook(
+        tmp_path / "firm", monkeypatch, "firm", goal_specs, goal_signals
+    )
+
+    assert _drive_note_goals(standard) == [
+        "younger authorized", "equal age first", "equal age second"
+    ]
+    assert _drive_note_goals(firm) == [
+        "older authorized", "equal age first", "equal age second"
+    ]
+    assert firm != standard
+    assert len(_drive_note_goals(firm)) == 3
+
+
+def test_firm_keeps_unauthorized_and_below_threshold_notes_on_existing_order(tmp_path, monkeypatch):
+    """Firm promotes only persisted, threshold-satisfied authorization."""
+    goal_specs = [
+        {"text": "authorized younger", "age_days": 4, "confidence": 0.1,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 3},
+        {"text": "unauthorized older", "age_days": 10, "confidence": 0.99},
+        {"text": "below threshold older", "age_days": 12, "confidence": 0.98,
+         "support_style": "firm", "push_when_stalled": 1, "stall_threshold_days": 13},
+    ]
+    goal_signals = [
+        {"relates_to_goal": spec["text"], "confidence": spec["confidence"]}
+        for spec in goal_specs
+    ]
+
+    firm = _run_persisted_pressure_hook(
+        tmp_path, monkeypatch, "firm", goal_specs, goal_signals
+    )
+    assert _drive_note_goals(firm) == [
+        "authorized younger", "unauthorized older", "below threshold older"
+    ]
+
+
+def test_pressure_drive_off_preserves_no_goals_appraisal_block(monkeypatch):
+    """Drive-off strips every drive field and preserves the ordinary appraisal
+    block byte-for-byte against the equivalent no-goals render."""
+    out = _run_pressure_hook(monkeypatch, "firm", drive_enabled=False)
+    expected = render.render_block({
+        "instincts": [],
+        "salient_observations": [
+            {"text": "the topic recurs across sessions", "confidence": 0.9}
+        ],
+        "contradiction_flags": [],
+        "suggested_memory_searches": [],
+        "goal_signals": [],
+        "gut_reaction": "",
+    })
+    assert out == {"context": expected}
+    assert "- drive " not in out["context"]
