@@ -374,9 +374,8 @@ def test_pre_llm_call_passes_standard_pressure_without_changing_render_contract(
         anansi._ctx = None
 
 
-def test_goals_cap_enforced(tmp_path):
-    """goals capped at 50; survivors are the most recent rows — mirrors
-    test_caps_enforced."""
+def test_unflagged_goals_cap_enforced(tmp_path):
+    """Unflagged goals remain capped at 50; survivors are the newest rows."""
     db = tmp_path / "state.db"
     assert store.ensure_db(db) is True
 
@@ -395,6 +394,34 @@ def test_goals_cap_enforced(tmp_path):
     texts = {g["text"] for g in snap["goals"]}
     assert "goal-59" in texts  # last-inserted survives
     assert "goal-00" not in texts  # first-inserted evicted
+
+
+def test_goal_cap_preserves_all_flagged_priorities_under_unflagged_pressure(tmp_path):
+    """The goals cap applies only to unflagged rows, never flagged priorities."""
+    db = tmp_path / "state.db"
+    assert store.ensure_db(db) is True
+
+    flagged = [
+        {
+            "text": "flagged priority %02d" % index,
+            "status": "active",
+            "flagged_priority": 1,
+        }
+        for index in range(55)
+    ]
+    unflagged = [
+        {"text": "ordinary goal %02d" % index, "status": "active"}
+        for index in range(60)
+    ]
+    assert store.apply_deltas({"goals_add": flagged + unflagged}, db) is True
+
+    snapshot = store.read_snapshot(db)
+    assert snapshot is not None
+    goals = {goal["text"]: goal for goal in snapshot["goals"]}
+    assert {"flagged priority %02d" % index for index in range(55)} <= set(goals)
+    assert sum(not goal["flagged_priority"] for goal in goals.values()) == 50
+    assert "ordinary goal 59" in goals
+    assert "ordinary goal 00" not in goals
 
 
 def test_locked_db_goal_write_returns_false(tmp_path):

@@ -38,14 +38,19 @@ def _filter_goals_by_domain(goals, drive_domains):
     returns the UNFILTERED goals (a filter bug must never crash the hook or
     silently drop everything)."""
     try:
-        if not goals or not drive_domains:
-            return goals
+        active_goals = [
+            goal for goal in (goals or [])
+            if isinstance(goal, dict) and goal.get("status") == "active"
+        ]
+        if not drive_domains:
+            return active_goals
         allowed = {str(d).strip() for d in drive_domains if str(d).strip()}
         if not allowed:
-            return goals
+            return active_goals
         kept = [
-            g for g in goals
-            if isinstance(g, dict) and str(g.get("domain") or "").strip() in allowed
+            goal for goal in active_goals
+            if goal.get("flagged_priority")
+            or str(goal.get("domain") or "").strip() in allowed
         ]
         return kept
     except Exception:
@@ -63,10 +68,12 @@ def _filter_signals_by_goals(goal_signals, goals, drive_domains):
     try:
         if not drive_domains or not goal_signals:
             return goal_signals
+        from . import render
+
         texts = [
-            str(g.get("text") or "").strip().lower()
+            g.get("text")
             for g in (goals or [])
-            if isinstance(g, dict) and str(g.get("text") or "").strip()
+            if isinstance(g, dict) and render._goal_tokens(g.get("text"))
         ]
         if not texts:
             return []  # whitelist active but no whitelisted goal -> none surface
@@ -74,8 +81,8 @@ def _filter_signals_by_goals(goal_signals, goals, drive_domains):
         for sig in goal_signals:
             if not isinstance(sig, dict):
                 continue
-            relates = str(sig.get("relates_to_goal") or "").strip().lower()
-            if relates and any(relates in t or t in relates for t in texts):
+            relates = sig.get("relates_to_goal")
+            if any(render._goal_text_matches(text, relates) for text in texts):
                 kept.append(sig)
         return kept
     except Exception:

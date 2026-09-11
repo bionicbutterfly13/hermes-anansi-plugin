@@ -674,6 +674,17 @@ def read_turns_since(after_id, db_path=None, limit=50):
                 pass
 
 
+def _enforce_goal_cap(conn) -> None:
+    """Cap only unflagged rows; persisted flagged priorities are exempt."""
+    conn.execute(
+        "DELETE FROM goals WHERE COALESCE(flagged_priority, 0)=0"
+        " AND id NOT IN"
+        " (SELECT id FROM goals WHERE COALESCE(flagged_priority, 0)=0"
+        "  ORDER BY id DESC LIMIT ?)",
+        (CAPS["goals"],),
+    )
+
+
 def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
     """THE single write entry point — one transaction, caps enforced inside it.
 
@@ -860,12 +871,13 @@ def apply_deltas(deltas: dict, db_path=None, busy_timeout_ms=None) -> bool:
             # Enforce caps inside the SAME transaction: evict oldest rows
             # (lowest id) beyond each cap; trust_scores evicts oldest
             # updated_at beyond its cap.
-            for table in ("concerns", "contradictions", "turn_log", "goals"):
+            for table in ("concerns", "contradictions", "turn_log"):
                 conn.execute(
                     "DELETE FROM {t} WHERE id NOT IN"
                     " (SELECT id FROM {t} ORDER BY id DESC LIMIT ?)".format(t=table),
                     (CAPS[table],),
                 )
+            _enforce_goal_cap(conn)
             conn.execute(
                 "DELETE FROM trust_scores WHERE key NOT IN"
                 " (SELECT key FROM trust_scores"
