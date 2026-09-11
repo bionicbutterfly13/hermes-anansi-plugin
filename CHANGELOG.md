@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-09-11 - Phase 8 evidence boundary and regression closure
+
+### Features
+
+- Added an offline regression for the established live-drive smoke command. It
+  forces unavailable network preflight, verifies exit `2` with an
+  `INCONCLUSIVE` result, and fails if the provider import seam is reached.
+- Added the Phase 8 technical live-smoke record. It begins `UNRUN`, names the
+  sole established command and preserves `0` PASS, `1` FAIL and `2`
+  INCONCLUSIVE as distinct evidence states.
+
+### Fixes
+
+- Classified a locked schema migration as unavailable without partial mutation
+  or quarantine. The root cause was treating an unavailable store as a repair
+  opportunity rather than a fail-open condition.
+- Kept configuration-degradation telemetry shape-only, so rejected values do
+  not become a second secret-bearing data path.
+- Carried persisted flagged priorities through storage, filtering and rendering
+  without treating a bounded unflagged list as permission to erase them.
+- Made read-time persisted timing authoritative, preventing model-supplied or
+  stale reflection timing from changing fresh-versus-stalled drive output.
+
+### Learnings
+
+- An offline check can prove that the live lane stops before a provider import;
+  it cannot establish a provider-backed PASS. Only separately authorized
+  exit-0 evidence can do that.
+- Fail-open handling needs consistent classification across migration, config,
+  persistence and rendering. A harmless-looking fallback becomes an integrity
+  bug when it silently changes or hides user state.
+
 ## 2026-09-10 - Retired planning workflow removal
 
 ### Fixes
