@@ -12,6 +12,10 @@
   checks that could exempt ordinary off-domain goals and bypass their cap.
 - Preserved known fresh momentum as zero-day evidence through snapshot and the
   hook. The root cause was using the unknown sentinel for an observed fresh age.
+- Classified non-finite legacy priorities as ordinary values at every
+  coercion boundary. The root cause was omitting `OverflowError`, which let an
+  infinite SQLite value suppress the complete persisted snapshot and trigger a
+  containment-filter fallback.
 
 ### Learnings
 
@@ -21,6 +25,8 @@
   never-omit exemption, including when a malformed legacy row is encountered.
 - Unknown timing means the store could not establish evidence; a known moving
   goal needs explicit zero-day timing so rendering can remain grounded.
+- Numeric coercion must account for non-finite values, since `int(infinity)`
+  raises a distinct `OverflowError` rather than a `ValueError`.
 
 ## 2026-09-11 - Phase 8 evidence boundary and regression closure
 

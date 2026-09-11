@@ -35,7 +35,7 @@ def _is_positive_priority(goal):
     """Return whether a goal has a valid user-flagged priority."""
     try:
         return int(goal.get("flagged_priority")) > 0
-    except (AttributeError, TypeError, ValueError):
+    except (AttributeError, TypeError, ValueError, OverflowError):
         return False
 
 
