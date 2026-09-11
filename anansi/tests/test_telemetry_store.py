@@ -220,6 +220,26 @@ def test_telemetry_summary_reflect_vocabulary(tmp_path):
     assert summary["p50_wall_ms"] == 120  # ok row only; reflect_ok wall excluded
 
 
+def test_telemetry_summary_config_degraded_is_non_failure(tmp_path):
+    """Config-degradation rows stay inspectable without becoming failures."""
+    db = tmp_path / "state.db"
+    assert store.ensure_db(db) is True
+    store.record_telemetry("ok", wall_ms=120, db_path=db)
+    store.record_telemetry(
+        "config_degraded",
+        error="drive_pressure: rejected <str len=7>, applied 'standard'",
+        db_path=db,
+    )
+    store.record_telemetry("timeout", error="deadline hit", db_path=db)
+
+    summary = store.telemetry_summary(db)
+
+    assert summary is not None
+    assert summary["by_outcome"]["config_degraded"] == 1
+    assert summary["failure_count"] == 1
+    assert summary["last_error"] == "deadline hit"
+
+
 def test_telemetry_summary_absent_db_returns_none(tmp_path):
     assert store.telemetry_summary(tmp_path / "absent" / "state.db") is None
     assert not (tmp_path / "absent" / "state.db").exists()  # never creates
