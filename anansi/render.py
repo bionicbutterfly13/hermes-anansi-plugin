@@ -231,8 +231,13 @@ def enrich_goal_signals(goal_signals, goals):
             sig["momentum"] = momentum.get("momentum")
             days = momentum.get("stalled_days")
             # Read-time persisted momentum is authoritative over model metadata.
-            if isinstance(days, int) and "stalled_days" not in sig:
+            # A model-provided age must not outrank the actual age from this
+            # fresh snapshot; if no persisted age exists, remove any stale
+            # model age rather than treating it as ground truth.
+            if isinstance(days, int):
                 sig["stalled_days"] = days
+            else:
+                sig.pop("stalled_days", None)
             # User-authorized pressure metadata (kept separate from the
             # neutral momentum above) — copied through for ordering + the
             # inspectable drive-effect clause.
@@ -251,11 +256,31 @@ def enrich_goal_signals(goal_signals, goals):
         return [g for g in (goal_signals or []) if isinstance(g, dict)]
 
 
+def _firm_order_key(item):
+    """Bounded firm-only priority for ordinary authorized stalled goals.
+
+    The first tuple item keeps threshold-satisfied, user-authorized stalled
+    goals ahead of every other note.  Within that protected cohort, actual
+    read-time stalled age is decisive.  The established standard salience
+    remains the confidence tie-breaker, and Python's stable sort preserves
+    input order for equal ages and confidence.
+    """
+    days = _resolve_stalled_days(item)
+    if _pressure_effect_active(item) and isinstance(days, int):
+        return (1, days, _drive_salience(item, "standard"))
+    return (0, 0, _drive_salience(item, "standard"))
+
+
 def _order_goal_signals(goal_signals, pressure=None):
-    """Stable descending order by drive salience: stalled (then user-pushed
-    stalled) first, moving next, unknown last. Stable so equal-salience
-    signals keep their input order."""
+    """Stable descending goal-note order.
+
+    Standard and quiet retain the established salience ordering.  Firm uses
+    an explicit, bounded tuple key so only user-authorized, threshold-satisfied
+    stalled goals are reordered by their actual stalled age.
+    """
     items = [g for g in (goal_signals or []) if isinstance(g, dict)]
+    if _coerce_pressure(pressure) == "firm":
+        return sorted(items, key=_firm_order_key, reverse=True)
     return sorted(
         items, key=lambda item: _drive_salience(item, pressure), reverse=True
     )
