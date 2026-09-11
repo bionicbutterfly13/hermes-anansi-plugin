@@ -148,7 +148,7 @@ def _coerce_float(value, default, lo, hi):
 def _coerce_int(value, default, lo, hi=None):
     try:
         result = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return default
     result = max(lo, result)
     return min(hi, result) if hi is not None else result

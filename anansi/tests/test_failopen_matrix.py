@@ -497,6 +497,43 @@ def test_session_start_valid_config_emits_no_degradation_rows(matrix_env, monkey
     assert "config_degraded" not in [row[0] for row in _telemetry_rows(matrix_env.db_path)]
 
 
+@pytest.mark.parametrize("value", [float("inf"), float("-inf")])
+def test_session_start_records_nonfinite_integer_degradations_per_reload(
+    matrix_env, monkeypatch, value
+):
+    """Each real session reload records one shape-only row for every int key."""
+    defaults = {
+        "history_chars": 4000,
+        "max_tokens": 700,
+        "reflect_every_n_turns": 5,
+        "reflect_max_tokens": 700,
+        "drive_energy_budget": 3,
+    }
+    monkeypatch.setattr(
+        config, "_load_host_entry", lambda: dict.fromkeys(defaults, value)
+    )
+
+    assert anansi.on_session_start(session_id="first") is None
+    assert anansi.on_session_start(session_id="second") is None
+    conn = sqlite3.connect("file:%s?mode=ro" % matrix_env.db_path, uri=True)
+    try:
+        rows = conn.execute(
+            "SELECT session_id, error FROM telemetry "
+            "WHERE outcome='config_degraded' ORDER BY id"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    expected_errors = [
+        "%s: rejected <float>, applied %r" % (key, default)
+        for key, default in defaults.items()
+    ]
+    assert rows == [("first", error) for error in expected_errors] + [
+        ("second", error) for error in expected_errors
+    ]
+    assert all(str(value) not in error for _, error in rows)
+
+
 @pytest.mark.parametrize("failure", [False, RuntimeError("telemetry unavailable")])
 def test_unavailable_config_telemetry_does_not_change_next_hook_output(
     matrix_env, monkeypatch, failure
