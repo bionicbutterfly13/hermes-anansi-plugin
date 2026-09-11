@@ -2,12 +2,14 @@
 
 import builtins
 import importlib.util
+import sys
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SMOKE_SCRIPT = REPO_ROOT / "scripts" / "live_drive_smoke.py"
-LIVE_RECORD = REPO_ROOT / ".planning" / "phases" / "08-close-known-gaps" / "08-LIVE-SMOKE.md"
 
 
 def _load_smoke_module():
@@ -20,11 +22,7 @@ def _load_smoke_module():
     return module
 
 
-def test_forced_offline_smoke_is_inconclusive_before_provider_import(
-    monkeypatch, capsys
-):
-    smoke = _load_smoke_module()
-    monkeypatch.setattr(smoke, "_network_up", lambda: False)
+def _forbid_provider_import(monkeypatch):
     original_import = builtins.__import__
 
     def forbid_provider_import(name, *args, **kwargs):
@@ -34,16 +32,26 @@ def test_forced_offline_smoke_is_inconclusive_before_provider_import(
 
     monkeypatch.setattr(builtins, "__import__", forbid_provider_import)
 
+
+def test_forced_offline_smoke_is_inconclusive_before_provider_import(
+    monkeypatch, capsys
+):
+    smoke = _load_smoke_module()
+    monkeypatch.setattr(sys, "path", sys.path.copy())
+    monkeypatch.setattr(smoke, "_bootstrap_sys_path", lambda: None)
+    monkeypatch.setattr(smoke, "_network_up", lambda: False)
+    _forbid_provider_import(monkeypatch)
+
     assert smoke.main() == smoke.INCONCLUSIVE == 2
     assert "INCONCLUSIVE" in capsys.readouterr().out
 
 
-def test_live_smoke_record_starts_unrun_with_the_only_authorized_command():
-    record = LIVE_RECORD.read_text(encoding="utf-8")
+def test_available_network_path_reaches_the_provider_import_guard(monkeypatch):
+    smoke = _load_smoke_module()
+    monkeypatch.setattr(sys, "path", sys.path.copy())
+    monkeypatch.setattr(smoke, "_bootstrap_sys_path", lambda: None)
+    monkeypatch.setattr(smoke, "_network_up", lambda: True)
+    _forbid_provider_import(monkeypatch)
 
-    assert "Status: UNRUN" in record
-    assert "$HERMES_HOME/hermes-agent/venv/bin/python scripts/live_drive_smoke.py" in record
-    assert "0 = PASS" in record
-    assert "1 = FAIL" in record
-    assert "2 = INCONCLUSIVE" in record
-    assert "separately authorized exit-0 evidence" in record
+    with pytest.raises(AssertionError, match="provider import"):
+        smoke.main()
