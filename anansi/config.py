@@ -90,6 +90,9 @@ DEFAULT_DRIVE_PRESSURE = "standard"
 _DRIVE_PRESSURE_CHOICES = frozenset({"quiet", "standard", "firm"})
 
 _cache = None
+_last_degradations = []
+_MISSING = object()
+_BOOL_TOKENS = ("true", "yes", "on", "1", "false", "no", "off", "0")
 
 
 def _load_host_entry():
@@ -186,12 +189,121 @@ def _coerce_choice(value, default, choices):
     return default
 
 
+def _value_shape(raw):
+    """Return a secret-safe shape for a rejected config value. Never raises."""
+    try:
+        if isinstance(raw, bool):
+            return "<bool>"
+        if isinstance(raw, str):
+            return "<str len=%d>" % len(raw)
+        if isinstance(raw, (int, float)):
+            return "<%s>" % type(raw).__name__
+        if isinstance(raw, (list, tuple, dict)):
+            return "<%s len=%d>" % (type(raw).__name__, len(raw))
+        if raw is None:
+            return "<none>"
+        return "<%s>" % type(raw).__name__
+    except Exception:
+        return "<unknown>"
+
+
+def _bool_honored(raw):
+    """Whether a provided value is accepted by _coerce_bool unchanged enough."""
+    return (
+        isinstance(raw, (bool, int, float))
+        or (isinstance(raw, str) and raw.strip().lower() in _BOOL_TOKENS)
+    )
+
+
+def _number_degraded(raw, effective):
+    """Whether numeric coercion rejected or clamped a provided value."""
+    try:
+        number = float(raw)
+        return number != number or number != float(effective)
+    except (TypeError, ValueError):
+        return True
+
+
+def _str_list_honored(raw):
+    """Whether every list member survives _coerce_str_list."""
+    if not isinstance(raw, list):
+        return False
+    try:
+        return all(str(member).strip() for member in raw)
+    except Exception:
+        return False
+
+
+def _config_degradations(entry, effective):
+    """Return secret-safe (key, rejected-shape, applied-default) records.
+
+    This works from a single load's local entry and effective values. Raw values
+    never reach module state, telemetry, or callers.
+    """
+    out = []
+
+    def add(key, raw, default):
+        out.append((key, _value_shape(raw), default))
+
+    try:
+        for key, default in (
+            ("enabled", DEFAULT_ENABLED),
+            ("reflection_enabled", DEFAULT_REFLECTION_ENABLED),
+            ("drive_enabled", DEFAULT_DRIVE_ENABLED),
+        ):
+            raw = entry.get(key, _MISSING)
+            if raw is not _MISSING and not _bool_honored(raw):
+                add(key, raw, default)
+
+        for key, default in (
+            ("confidence_threshold", DEFAULT_CONFIDENCE_THRESHOLD),
+            ("deadline_seconds", DEFAULT_DEADLINE_SECONDS),
+            ("history_chars", DEFAULT_HISTORY_CHARS),
+            ("max_tokens", DEFAULT_MAX_TOKENS),
+            ("reflect_every_n_turns", DEFAULT_REFLECT_EVERY_N_TURNS),
+            ("reflect_max_tokens", DEFAULT_REFLECT_MAX_TOKENS),
+            ("reflect_deadline_seconds", DEFAULT_REFLECT_DEADLINE_SECONDS),
+            ("drive_energy_budget", DEFAULT_DRIVE_ENERGY_BUDGET),
+        ):
+            raw = entry.get(key, _MISSING)
+            if raw is not _MISSING and _number_degraded(raw, effective.get(key)):
+                add(key, raw, default)
+
+        raw = entry.get("drive_domains", _MISSING)
+        if raw is not _MISSING and not _str_list_honored(raw):
+            add("drive_domains", raw, list(DEFAULT_DRIVE_DOMAINS))
+
+        raw = entry.get("drive_pressure", _MISSING)
+        if raw is not _MISSING and not (
+            isinstance(raw, str) and raw.strip().lower() in _DRIVE_PRESSURE_CHOICES
+        ):
+            add("drive_pressure", raw, DEFAULT_DRIVE_PRESSURE)
+
+        llm_cfg = entry.get("llm", _MISSING)
+        if isinstance(llm_cfg, dict):
+            raw = llm_cfg.get("model", _MISSING)
+            if raw is not _MISSING and not (
+                isinstance(raw, str) and bool(raw.strip())
+            ):
+                add("model", raw, DEFAULT_MODEL)
+    except Exception:
+        return out
+    return out
+
+
+def get_degradations():
+    """Return secret-safe records from the most recent config load."""
+    return list(_last_degradations)
+
+
 def get_cfg(force_reload=False) -> dict:
     """Return the effective config dict (cached). Never raises."""
-    global _cache
+    global _cache, _last_degradations
     if _cache is not None and not force_reload:
         return _cache
     entry = _load_host_entry() or {}
+    if not isinstance(entry, dict):
+        entry = {}
     llm_cfg = entry.get("llm")
     if not isinstance(llm_cfg, dict):
         llm_cfg = {}
@@ -239,10 +351,12 @@ def get_cfg(force_reload=False) -> dict:
             _DRIVE_PRESSURE_CHOICES,
         ),
     }
+    _last_degradations = _config_degradations(entry, _cache)
     return _cache
 
 
 def reset_cache() -> None:
     """Clear the cached config (called from on_session_start)."""
-    global _cache
+    global _cache, _last_degradations
     _cache = None
+    _last_degradations = []
