@@ -449,11 +449,16 @@ def test_session_start_emits_one_secret_safe_config_row_per_degradation(
     matrix_env, monkeypatch
 ):
     secret = "sk-rejected-config-value-should-never-persist"
+    invalid_parse = "not-a-number"
+    raw_domain = "infrastructure"
     monkeypatch.setattr(
         config,
         "_load_host_entry",
         lambda: {
             "deadline_seconds": 99,
+            "reflect_deadline_seconds": 0.1,
+            "confidence_threshold": invalid_parse,
+            "drive_domains": [raw_domain, " "],
             "drive_pressure": secret,
         },
     )
@@ -468,10 +473,13 @@ def test_session_start_emits_one_secret_safe_config_row_per_degradation(
         conn.close()
 
     assert rows == [
-        ("deadline_seconds: rejected <int>, applied 8.0",),
+        ("confidence_threshold: rejected <str len=%d>, applied 0.6" % len(invalid_parse),),
+        ("deadline_seconds: rejected <int>, applied 10.0",),
+        ("reflect_deadline_seconds: rejected <float>, applied 0.5",),
+        ("drive_domains: rejected <list len=2>, applied <list len=1>",),
         ("drive_pressure: rejected <str len=%d>, applied 'standard'" % len(secret),),
     ]
-    assert all(secret not in row[0] for row in rows)
+    assert all(raw not in row[0] for raw in (secret, invalid_parse, raw_domain) for row in rows)
 
 
 def test_session_start_valid_config_emits_no_degradation_rows(matrix_env, monkeypatch):

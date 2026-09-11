@@ -234,50 +234,50 @@ def _str_list_honored(raw):
         return False
 
 
+def _applied_value(value):
+    """Return a descriptor-safe representation of an effective config value."""
+    if isinstance(value, (list, tuple, dict)):
+        return _value_shape(value)
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return _value_shape(value)
+
+
 def _config_degradations(entry, effective):
-    """Return secret-safe (key, rejected-shape, applied-default) records.
+    """Return secret-safe (key, rejected-shape, applied-effective) records.
 
     This works from a single load's local entry and effective values. Raw values
     never reach module state, telemetry, or callers.
     """
     out = []
 
-    def add(key, raw, default):
-        out.append((key, _value_shape(raw), default))
+    def add(key, raw):
+        out.append((key, _value_shape(raw), _applied_value(effective.get(key))))
 
     try:
-        for key, default in (
-            ("enabled", DEFAULT_ENABLED),
-            ("reflection_enabled", DEFAULT_REFLECTION_ENABLED),
-            ("drive_enabled", DEFAULT_DRIVE_ENABLED),
-        ):
+        for key in ("enabled", "reflection_enabled", "drive_enabled"):
             raw = entry.get(key, _MISSING)
             if raw is not _MISSING and not _bool_honored(raw):
-                add(key, raw, default)
+                add(key, raw)
 
-        for key, default in (
-            ("confidence_threshold", DEFAULT_CONFIDENCE_THRESHOLD),
-            ("deadline_seconds", DEFAULT_DEADLINE_SECONDS),
-            ("history_chars", DEFAULT_HISTORY_CHARS),
-            ("max_tokens", DEFAULT_MAX_TOKENS),
-            ("reflect_every_n_turns", DEFAULT_REFLECT_EVERY_N_TURNS),
-            ("reflect_max_tokens", DEFAULT_REFLECT_MAX_TOKENS),
-            ("reflect_deadline_seconds", DEFAULT_REFLECT_DEADLINE_SECONDS),
-            ("drive_energy_budget", DEFAULT_DRIVE_ENERGY_BUDGET),
+        for key in (
+            "confidence_threshold", "deadline_seconds", "history_chars",
+            "max_tokens", "reflect_every_n_turns", "reflect_max_tokens",
+            "reflect_deadline_seconds", "drive_energy_budget",
         ):
             raw = entry.get(key, _MISSING)
             if raw is not _MISSING and _number_degraded(raw, effective.get(key)):
-                add(key, raw, default)
+                add(key, raw)
 
         raw = entry.get("drive_domains", _MISSING)
         if raw is not _MISSING and not _str_list_honored(raw):
-            add("drive_domains", raw, list(DEFAULT_DRIVE_DOMAINS))
+            add("drive_domains", raw)
 
         raw = entry.get("drive_pressure", _MISSING)
         if raw is not _MISSING and not (
             isinstance(raw, str) and raw.strip().lower() in _DRIVE_PRESSURE_CHOICES
         ):
-            add("drive_pressure", raw, DEFAULT_DRIVE_PRESSURE)
+            add("drive_pressure", raw)
 
         llm_cfg = entry.get("llm", _MISSING)
         if isinstance(llm_cfg, dict):
@@ -285,7 +285,7 @@ def _config_degradations(entry, effective):
             if raw is not _MISSING and not (
                 isinstance(raw, str) and bool(raw.strip())
             ):
-                add("model", raw, DEFAULT_MODEL)
+                add("model", raw)
     except Exception:
         return out
     return out

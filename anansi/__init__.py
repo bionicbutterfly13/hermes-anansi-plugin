@@ -84,7 +84,9 @@ def _filter_signals_by_goals(goal_signals, goals, drive_domains):
 
 def _config_degradation_error(key, shape, applied_default):
     """Format a config diagnostic without rendering a rejected value."""
-    if isinstance(applied_default, (str, int, float, bool)) or applied_default is None:
+    if isinstance(applied_default, str) and applied_default.startswith("<") and applied_default.endswith(">"):
+        applied = applied_default
+    elif isinstance(applied_default, (str, int, float, bool)) or applied_default is None:
         applied = repr(applied_default)
     elif isinstance(applied_default, (list, tuple, dict)):
         applied = "<%s len=%d>" % (type(applied_default).__name__, len(applied_default))

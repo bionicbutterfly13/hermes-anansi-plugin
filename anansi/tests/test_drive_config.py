@@ -123,6 +123,33 @@ def test_config_degradations_are_shape_only_and_once_per_key(monkeypatch):
     assert all(record[1].startswith("<") for record in degradations)
 
 
+def test_config_degradations_describe_effective_values_without_raw_inputs(monkeypatch):
+    """Descriptors retain only each key's applied effective value or shape."""
+    invalid_parse = "not-a-number"
+    raw_domain = "infrastructure"
+    entry = {
+        "confidence_threshold": invalid_parse,
+        "deadline_seconds": 999,
+        "reflect_deadline_seconds": 0.1,
+        "drive_domains": [raw_domain, " "],
+    }
+    monkeypatch.setattr(config, "_load_host_entry", lambda: entry)
+
+    cfg = config.get_cfg(force_reload=True)
+    degradations = dict((key, (shape, applied)) for key, shape, applied in config.get_degradations())
+
+    assert cfg["confidence_threshold"] == config.DEFAULT_CONFIDENCE_THRESHOLD
+    assert cfg["deadline_seconds"] == 10.0
+    assert cfg["reflect_deadline_seconds"] == 0.5
+    assert cfg["drive_domains"] == [raw_domain]
+    assert degradations["confidence_threshold"] == ("<str len=%d>" % len(invalid_parse), 0.6)
+    assert degradations["deadline_seconds"] == ("<int>", 10.0)
+    assert degradations["reflect_deadline_seconds"] == ("<float>", 0.5)
+    assert degradations["drive_domains"] == ("<list len=2>", "<list len=1>")
+    assert invalid_parse not in repr(degradations)
+    assert raw_domain not in repr(degradations)
+
+
 def test_config_degradations_ignore_normalization_and_cached_reads(monkeypatch):
     """Valid normalization is not degradation, and cache hits do not duplicate it."""
     entry = {
