@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-11 - README aligned with the merged Phase 8 release
+
+### Fixes
+
+- Replaced the README's September 9 branch snapshot with the verified Phase 8
+  integration baseline. Documented the repaired priority, pressure, migration and
+  configuration behavior, the recorded 199-test result, and GSD's remaining
+  phases. The README had retained pre-merge limitations and unmerged-work claims
+  after those repairs reached main.
+
+### Learnings
+
+- Release documentation needs its own evidence check after integration. Keep
+  tested implementation, unresolved limitations and unrun live verification
+  distinct when updating a dated snapshot.
+
 ## 2026-09-11 - Non-finite integer configuration boundary
 
 ### Fixes
