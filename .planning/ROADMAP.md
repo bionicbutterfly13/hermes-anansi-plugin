@@ -179,13 +179,13 @@ Phase identifiers map the seven source specs; they do not impose a new total ord
 **Requirements**: REQ-08.1-02, REQ-08.1-03, REQ-08.1-04, REQ-08.1-05, REQ-08.1-06, REQ-08.1-07, REQ-08.1-08
 **Requirement source:** `.planning/phases/08.1-daily-use-v1/08.1-RESEARCH.md` Phase Requirements table (derived from D-02..D-08)
 **Depends on:** Phase 8
-**Plans:** 6 plans
+**Plans:** 1/6 plans executed
 
 Plans:
 
 **Wave 1**
 
-- [ ] 08.1-01-PLAN.md — Lineage cleanup: commit quick task 260912-cqc, fix `_repo_root()`/`_last_commit_epoch()` for linked-worktree `.git` files (hermetic never-omit pin), merge `--no-ff` and push; file the 4 drafts as DRAFT Phase 14 inputs; close PR #2; delete `001-close-known-gaps` local and remote (Q2, D-02, D-15).
+- [x] 08.1-01-PLAN.md — Lineage cleanup: commit quick task 260912-cqc, fix `_repo_root()`/`_last_commit_epoch()` for linked-worktree `.git` files (hermetic never-omit pin), merge `--no-ff` and push; file the 4 drafts as DRAFT Phase 14 inputs; close PR #2; delete `001-close-known-gaps` local and remote (Q2, D-02, D-15).
 
 **Wave 2** (08.1-02 may halt at Dr. Mani's repair confirmation; 08.1-03..06 do not depend on it)
 
