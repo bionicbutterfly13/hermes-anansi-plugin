@@ -360,10 +360,38 @@ def _momentum_default():
     return {"momentum": "unknown", "stalled_days": None, "salience": 0.0}
 
 
+def _git_dir(repo_root):
+    """Return the git dir for `repo_root`: the `.git` directory, or, when
+    `.git` is a linked-worktree FILE, the resolved target of its first-line
+    `gitdir: <path>` (a relative path resolves against `repo_root`). Returns
+    None for anything else (empty file, no `gitdir:` line, missing target).
+    Read-mode open() only — NO shell-out, NO git library. Never raises.
+    """
+    try:
+        dot_git = Path(repo_root) / ".git"
+        if dot_git.is_dir():
+            return dot_git
+        if dot_git.is_file():
+            with open(dot_git, "r", encoding="utf-8") as fh:
+                first = fh.readline().strip()
+            if first.startswith("gitdir:"):
+                target = Path(first.split(":", 1)[1].strip())
+                if not target.is_absolute():
+                    target = Path(repo_root) / target
+                target = target.resolve()
+                if target.is_dir():
+                    return target
+        return None
+    except Exception:
+        return None
+
+
 def _repo_root(start=None):
-    """Walk up from a discovered start dir until a `.git` directory is found;
-    return the Path of the repo root, or None. Start is cwd or the
-    $HERMES_HOME parent — NEVER a literal path (standing rule). Never raises.
+    """Walk up from a discovered start dir until a `.git` directory, or a
+    linked-worktree `.git` file whose `gitdir:` target exists, is found;
+    return the Path of the nearest such repo root, or None. Start is cwd or
+    the $HERMES_HOME parent — NEVER a literal path (standing rule). Never
+    raises.
     """
     try:
         if start is not None:
@@ -380,7 +408,7 @@ def _repo_root(start=None):
             return None
         current = current.resolve()
         for candidate in (current, *current.parents):
-            if (candidate / ".git").is_dir():
+            if _git_dir(candidate) is not None:
                 return candidate
         return None
     except Exception:
@@ -391,17 +419,21 @@ def _last_commit_epoch(repo_root):
     """Resolve the current branch tip's committer epoch from the git reflog
     using ONLY read-mode open() + path reads — NO shell-out, NO git library.
 
-    `.git/HEAD` holds `ref: refs/heads/<branch>` (or a bare sha when
-    detached); the LAST line of `.git/logs/HEAD` is the most-recent reflog
-    entry, whose committer epoch is the integer field immediately BEFORE the
-    timezone offset, just before the `\\t`. Returns a float epoch, or None on
-    ANY problem (absent/corrupt .git, unreadable reflog, unparseable line).
-    Never raises.
+    The git dir comes from `_git_dir`: the `.git` directory, or for a linked
+    worktree the `gitdir:` target of its `.git` file, which holds that
+    worktree's own `HEAD` and `logs/HEAD`. `HEAD` holds
+    `ref: refs/heads/<branch>` (or a bare sha when detached); the LAST line
+    of `logs/HEAD` is the most-recent reflog entry, whose committer epoch is
+    the integer field immediately BEFORE the timezone offset, just before the
+    `\\t`. Returns a float epoch, or None on ANY problem (absent/corrupt git
+    dir, unreadable reflog, unparseable line). Never raises.
     """
     try:
         if repo_root is None:
             return None
-        git_dir = Path(repo_root) / ".git"
+        git_dir = _git_dir(repo_root)
+        if git_dir is None:
+            return None
         # Resolve HEAD purely for completeness/robustness; the reflog tail is
         # the authoritative recency signal regardless of branch.
         head_path = git_dir / "HEAD"

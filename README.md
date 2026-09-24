@@ -104,8 +104,8 @@ The remaining boundaries matter when evaluating the plugin:
   Protected priorities can also make the block exceed its ordinary soft size
   target.
 - **Activity is not accomplishment.** Repository activity may be unrelated to a
-  goal, directory timestamps do not track every nested edit, and linked Git
-  worktrees are not recognized by the current repository detector.
+  goal, and directory timestamps do not track every nested edit. A linked Git
+  worktree's `.git` file is followed to that worktree's own reflog.
 - **Timeouts do not cover the whole hook.** The default eight-second limit bounds
   waiting for an LLM result. Database operations can add delay, and queued calls
   can still execute after their callers time out.

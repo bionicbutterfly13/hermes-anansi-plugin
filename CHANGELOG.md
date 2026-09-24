@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-09-24 - Goal momentum follows linked Git worktrees
+
+### Fixes
+
+- Goal momentum inside a linked Git worktree read the enclosing checkout's
+  reflog, or nothing. The root cause was that the repository walk-up accepted
+  only a `.git` directory and `_last_commit_epoch` hardcoded `<root>/.git`, so
+  a worktree's `.git` file was skipped. A shared `store._git_dir()` helper now
+  follows the `gitdir:` line (absolute or relative) to the worktree's own
+  `HEAD` and `logs/HEAD`, using read-mode `open()` only. Malformed `.git`
+  files and missing targets still degrade to unknown momentum.
+- The never-omit full-hook test
+  `test_persisted_flagged_priorities_survive_empty_signal_full_hook` now pins
+  `store._repo_root`, so its result no longer depends on how old the ambient
+  checkout's reflog is. Its assertions are unchanged.
+
+### Learnings
+
+- A test that reads ambient git state is a time bomb: it passed or failed on
+  the age of whichever checkout ran it. Hook-level tests should pin repository
+  discovery; ground-truth parsing belongs in `tmp_path` fixtures.
+
 ## 2026-09-12 - Shared worker backlog repair (unreleased)
 
 ### Fixes
