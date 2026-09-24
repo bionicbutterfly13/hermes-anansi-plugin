@@ -1,20 +1,20 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 9
-current_phase_name: Autobiographical User Model
+current_phase: "08.1"
+current_phase_name: Daily-use v1
 current_plan: Not started
 status: planning
-stopped_at: Phase 8 complete, ready to plan Phase 09
-last_updated: "2026-09-11T16:11:34.365Z"
+stopped_at: Phase 08.1 inserted after grill session 2026-09-23
+last_updated: "2026-09-24T10:51:07.389Z"
 last_activity: 2026-09-11
 last_activity_desc: Phase 8 complete, transitioned to Phase 09
-state_head: f23ee37023e04dd9514b4425e3f00c53c04f19e1
+state_head: df51b36ff9b7f2de32bcf9b3f9c1f3f636ded39f
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 1
   total_plans: 5
   completed_plans: 5
-  percent: 14
+  percent: 13
 ---
 
 # Project State
@@ -28,18 +28,18 @@ See: .planning/PROJECT.md (updated 2026-09-11)
 
 ## Current Position
 
-Current Phase: 9
-Current Phase Name: Autobiographical User Model
+Current Phase: 08.1
+Current Phase Name: Daily-use v1
 Total Phases: 7
 Current Plan: Not started
 Total Plans in Phase: 0
-Phase: 9 (Autobiographical User Model), ready to plan
+Phase: 08.1 (Daily-use v1), ready to plan
 Plan: Not started
 Status: Ready to plan
 Last activity: 2026-09-11 — Phase 8 complete, transitioned to Phase 09
 Last Activity Description: Phase 8 complete, transitioned to Phase 09
 
-Progress: [█░░░░░░░░░] 14%
+Progress: [█░░░░░░░░░] 13%
 
 ## Settled
 
@@ -64,7 +64,13 @@ Progress: [█░░░░░░░░░] 14%
 
 ## Session Continuity
 
-Stopped at: Phase 8 complete, ready to plan Phase 09
-Next action: Use GSD to plan Phase 9's worldview-first increment after the authorized Phase 8 publication.
+Stopped at: Phase 08.1 inserted after grill session 2026-09-23
+Next action: Plan Phase 08.1 (Daily-use v1) with $gsd-plan-phase 08.1; Phases 9-14 gated on its day-7 decision rule.
 Resume file: None
 History: milestones/pre-gsd-2026-09-10/STATE.md and existing phase evidence.
+
+## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 08.1 inserted after Phase 8: Daily-use v1: install in chief-of-staff, fix replay tagging, /goal entry, gpt-6-sol aux routing, full kill switch; 7-day exit gate decides Phases 9-14 (grill log 2026-09-23) (URGENT)
