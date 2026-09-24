@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-09-12 - Shared worker backlog repair (unreleased)
+
+### Fixes
+
+- Appraisal and reflection now share an atomic worker reservation. Busy calls
+  return `skipped:worker_busy` or `reflect_skipped:worker_busy`, with no fresh
+  injection or queued model request. Previously, timed-out callers left their
+  work in the executor, allowing later requests to accumulate behind it.
+- Timeout handling cancels pending work. A deadline check at worker entry also
+  prevents an expired wrapper from calling the model when cancellation loses
+  the race with executor startup. Already-running requests retain the worker
+  until completion; their late results are unused.
+- Clarified the wait setting and cancellation limits in code comments. The
+  eight-second default and ten-second ceiling are unchanged.
+
+### Learnings
+
+- A caller timeout is not request cancellation. Admission must track the
+  future through completion, and every caller sharing an executor must use
+  the same gate. Event-controlled regression tests cover contention, pending
+  cancellation, startup races, recovery, telemetry and reflection watermarks.
+- Verification: all 14 new worker cases pass. The full suite reports 212 passed
+  and one pre-existing priority-rendering failure (198 passed and the same
+  failure before this repair). Nested worktree discovery selects the parent
+  checkout's Git history; that separate defect still prevents a clean release
+  gate. No further live-provider trial was run.
+
 ## 2026-09-11 - README aligned with the merged Phase 8 release
 
 ### Fixes

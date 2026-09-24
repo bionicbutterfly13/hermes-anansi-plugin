@@ -314,14 +314,27 @@ def run_reflection(*, llm, digest, cfg) -> ReflectionResult:
                     return llm.complete_structured(**call_kwargs)
             return llm.complete_structured(**call_kwargs)
 
-        # REUSE the appraisal executor (03-CONTEXT) — appraisal and
-        # reflection never run concurrently (both dispatch sync on the
-        # turn thread).
-        future = appraisal._get_executor().submit(_worker)
+        # Share admission as well as the executor: either path may still
+        # occupy the worker after its caller has timed out.
+        future = appraisal._submit_if_idle(
+            _worker, expires_at=time.monotonic() + deadline
+        )
+        if future is None:
+            return ReflectionResult(
+                parsed=None,
+                outcome="reflect_skipped:worker_busy",
+                wall_ms=_wall_ms(),
+                model=requested_model or "",
+                tokens_in=0,
+                tokens_out=0,
+                error=None,
+            )
         try:
             result = future.result(timeout=deadline)
         except FuturesTimeoutError:
-            # Background call is discarded — do NOT shutdown/join.
+            # Cancel pending work, without joining a running request. Running
+            # work retains the shared slot until its unused result completes.
+            future.cancel()
             return ReflectionResult(
                 parsed=None,
                 outcome="reflect_timeout",
