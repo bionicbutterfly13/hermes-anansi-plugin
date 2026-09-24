@@ -80,3 +80,13 @@ the full gate. No commit, merge, push, plugin install or provider call occurred.
 Running requests still cannot be stopped by cancelling their Python future;
 they can keep the worker occupied and delay process exit. Cancellation research
 and any new live-provider trial remain separate follow-ups.
+
+## Follow-up (2026-09-24, plan 08.1-01)
+
+Code committed as `4d0b9b1`. The nested-worktree discovery defect is fixed in
+`757457c` (`fix(store): follow linked-worktree .git files for goal momentum`):
+`store._git_dir()` follows a linked worktree's `.git` file, and the never-omit
+full-hook test now pins `store._repo_root`. Final `./scripts/test.sh` in the
+worktree: **219 passed, 0 failed**. The release-gate failure recorded above is
+resolved by the repair, not waived. This SUMMARY's `status: incomplete`
+frontmatter is kept as the 2026-09-12 historical record.
