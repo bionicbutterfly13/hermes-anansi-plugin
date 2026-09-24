@@ -2,13 +2,13 @@
 gsd_state_version: "1.0"
 current_phase: "08.1"
 current_phase_name: Daily-use v1
-current_plan: Not started
+current_plan: "08.1-02 (blocked: waiting for Dr. Mani \"done\" on system cleanup); 08.1-03 next runnable"
 status: executing
 stopped_at: Phase 08.1 inserted after grill session 2026-09-23
-last_updated: "2026-09-24T20:34:26.077Z"
-last_activity: 2026-09-11
-last_activity_desc: Phase 08.1 planning complete — 6 plans ready
-state_head: 355a7c9da46c00c309e1b440efcf739d92c18f4b
+last_updated: "2026-09-24T21:55:33.477Z"
+last_activity: 2026-09-24
+last_activity_desc: "08.1-01 complete: cqc + linked-worktree fix merged e3daa90, 219 tests, PR #2 closed"
+state_head: e3daa90664d4fb54a02cf8c602af8b317a421272
 progress:
   total_phases: 8
   completed_phases: 1
@@ -24,20 +24,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-11)
 
 **Core value:** Grounded, observational appraisal with fail-open behavior and protected user priorities.
-**Current focus:** Phase 9 planning is next; Phase 8 publication is authorized.
+**Current focus:** Phase 08.1 — Daily-use v1
 
 ## Current Position
 
 Current Phase: 08.1
 Current Phase Name: Daily-use v1
 Total Phases: 7
-Current Plan: Not started
+Current Plan: 08.1-02 (blocked: waiting for Dr. Mani "done" on system cleanup); 08.1-03 next runnable
 Total Plans in Phase: 6
-Phase: 08.1 (Daily-use v1) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-09-11 — Phase 8 complete, transitioned to Phase 09
-Last Activity Description: Phase 08.1 planning complete — 6 plans ready
+Phase: 08.1 (Daily-use v1) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 08.1
+Last activity: 2026-09-24 — Phase 08.1 execution started
+Last Activity Description: 08.1-01 complete: cqc + linked-worktree fix merged e3daa90, 219 tests, PR #2 closed
 
 Progress: [█░░░░░░░░░] 13%
 
