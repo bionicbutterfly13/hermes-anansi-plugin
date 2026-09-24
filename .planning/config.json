@@ -20,7 +20,8 @@
     "nyquist_validation": true,
     "ai_integration_phase": true,
     "auto_advance": false,
-    "_auto_chain_active": false
+    "_auto_chain_active": false,
+    "use_worktrees": false
   },
   "parallelization": {
     "enabled": true,
@@ -41,7 +42,7 @@
     "context_warnings": true
   },
   "git": {
-    "branching_strategy": "phase",
+    "branching_strategy": "none",
     "phase_branch_template": "phase-{phase}-{slug}",
     "milestone_branch_template": "{milestone}-{slug}"
   },
