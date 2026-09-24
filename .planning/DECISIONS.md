@@ -38,3 +38,45 @@ which is ephemeral (appended at API-call time only, never persisted — conversa
 **R3 — APPR-06 trust fallback: annotated, unchanged.** Mechanism unit-proven; unproducible live
 here (host model ~37s/appraisal exceeds the deadline clamp → degrades to designed fail-open
 timeout). Correct behavior for installs with faster host models. No code change.
+
+## 2026-09-12 - Prevent timeout backlogs before increasing the wait
+
+**Status:** Decision accepted by Dr. Mani; implemented in the uncommitted
+`codex/clarify-appraisal-timeout` worktree. All 14 worker regression cases pass.
+The full release gate still has one pre-existing failure; no live-test pass.
+
+**Context:** `deadline_seconds` bounds the caller's wait, not cancellation of
+the model request. Appraisal and reflection share one worker. The bounded live
+diagnostic series produced two appraisal timeouts near eight seconds and one
+process stopped after 55 seconds. A separate in-process check confirmed that a
+queued request can execute after its caller has already timed out.
+
+**Decision:** First, skip new appraisals while the worker is busy and cancel
+expired queued work. Then investigate whether Hermes and the configured provider
+connection can cancel a running request. Queued-work cancellation must not be
+described as cancellation of a request that has already started.
+
+**Accepted trade-off:** Some replies will proceed without fresh Anansi
+observations while the worker is occupied. This approach prevents an accumulating
+appraisal backlog; it does not free a worker whose running request remains stuck.
+
+**Implementation:** GSD quick task `260912-cqc` checks Constitution Principles
+I-VII and covers atomic worker admission, both shared callers, cancellation of
+pending work and a worker-entry expiration guard. Busy reflection preserves
+captured turns and the watermark, while retaining the established consumed
+session-change trigger. This decision does not amend the constitution.
+
+**Pending:** Repair the pre-existing nested-worktree Git discovery defect before
+claiming a clean release gate. Commit, integration and further live verification
+remain pending. Actual running-request cancellation support remains unverified.
+
+**Deferred:** Additional workers and process isolation are not selected for the
+initial repair. Increasing the timeout is not the selected backlog fix. Keep the
+eight-second default and ten-second configuration ceiling unchanged for now;
+the suggested 30-second diagnostic limit is not an implemented or validated
+everyday setting. No further live-provider run is authorized by this record.
+
+**Evidence:** Current call paths in [appraisal.py](../anansi/appraisal.py) and
+[reflection.py](../anansi/reflection.py); the diagnostic results and Dr. Mani's
+acceptance in this task; [quick-task verification](quick/260912-cqc-prevent-shared-appraisal-and-reflection-/260912-cqc-SUMMARY.md).
+Earlier R1 records remain historical rationale for the default.

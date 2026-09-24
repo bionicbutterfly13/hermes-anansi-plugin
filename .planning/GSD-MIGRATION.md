@@ -61,13 +61,14 @@ Classifier records under `milestones/gsd-intake-2026-09-10/` now use portable GS
 
 ## Deferred inputs
 
-The original feature worktree contains three untracked planning documents. They remain there, unchanged, and are not part of the tracked legacy planning intake:
+On 2026-09-24, plan 08.1-01 (decision D-02) moved the four deferred untracked inputs to `.planning/reference/phase-14-inputs/` as DRAFT Phase 14 inputs; see that directory's `README.md`. They are not evidence and were not part of the tracked legacy planning intake. Original SHA-256 provenance:
 
-- `docs/07-SECURITY.md`, SHA-256 `56acc696306e8c070bf503ed88319e519530f6e4b4945239719acee553eb92fb`.
-- `COMPLETION-PLAN.md` (original feature checkout, untracked), SHA-256 `0bc04ae777addac3e7ee569810c457385a3f5fad5378ed5103bb82c41d996ef1`.
-- `LIVE-VERIFICATION.md` (original feature checkout, untracked), SHA-256 `4b892252f6ac1996523b7938ee12f318a39273c3f4295398f6983a84f48d3a32`.
+- `docs/07-SECURITY.md`, SHA-256 `56acc696306e8c070bf503ed88319e519530f6e4b4945239719acee553eb92fb`; now `DRAFT-07-SECURITY.md`, byte-identical.
+- `specs/COMPLETION-PLAN.md`, SHA-256 `0bc04ae777addac3e7ee569810c457385a3f5fad5378ed5103bb82c41d996ef1`; now `DRAFT-COMPLETION-PLAN.md`, byte-identical.
+- `specs/LIVE-VERIFICATION.md`, SHA-256 `4b892252f6ac1996523b7938ee12f318a39273c3f4295398f6983a84f48d3a32`; now `DRAFT-LIVE-VERIFICATION.md`. This is the one copy that differs: its 2026-07-22 ledger row for `scripts/live_trust_smoke.py` was removed because no live run produced it (grill log 2026-09-23).
+- `scripts/live_trust_smoke.py`, SHA-256 `dac4eb926a4a76ad625e1cab0ccce3decd3420188a7565033b6bf44c10fa4fc3`; now `DRAFT-live_trust_smoke.py`, byte-identical. It is not a supported proof lane.
 
-The original untracked `scripts/live_trust_smoke.py` also remains outside this planning-only migration. Deferred material must be explicitly accounted for before claiming that every repository document has been ingested.
+Plan 08.1-01 deletes the untracked originals from the main checkout only after the merge and a hash check of the tracked copies; the recorded bytes then live in Git history.
 
 ## Validation boundary
 

@@ -48,6 +48,29 @@ def _write_git(repo_root, epoch, *, ref="refs/heads/master", garbage=False):
     (git_dir / "logs" / "HEAD").write_text(reflog, encoding="utf-8")
 
 
+def _write_linked_worktree(tmp_path, epoch, *, relative=False, dot_git_text=None):
+    """Synthesize a linked worktree: the per-worktree git dir lives at
+    `<tmp>/main/.git/worktrees/wt` (HEAD + logs/HEAD in `_write_git`'s reflog
+    format) and `<tmp>/wt/.git` is a FILE holding `gitdir: <path>`, absolute
+    or relative, or `dot_git_text` verbatim. Returns (worktree_root, gitdir)."""
+    tmp_path = Path(tmp_path)
+    gitdir = tmp_path / "main" / ".git" / "worktrees" / "wt"
+    (gitdir / "logs").mkdir(parents=True, exist_ok=True)
+    (gitdir / "HEAD").write_text("ref: refs/heads/wt\n", encoding="utf-8")
+    reflog = (
+        "%s %s Dr Mani <mani@example.com> %d -0400\tcommit: seed\n"
+        % ("0" * 40, "b" * 40, int(epoch))
+    )
+    (gitdir / "logs" / "HEAD").write_text(reflog, encoding="utf-8")
+    worktree = tmp_path / "wt"
+    worktree.mkdir(parents=True, exist_ok=True)
+    if dot_git_text is None:
+        target = Path("..") / "main" / ".git" / "worktrees" / "wt" if relative else gitdir
+        dot_git_text = "gitdir: %s\n" % target
+    (worktree / ".git").write_text(dot_git_text, encoding="utf-8")
+    return worktree, gitdir
+
+
 # ---------------------------------------------------------------------------
 # DRIVE-02: goal_momentum from ground truth (read-time)
 # ---------------------------------------------------------------------------
@@ -149,6 +172,100 @@ def test_velocity_uses_no_subprocess_self_check():
     src = (Path(store.__file__)).read_text(encoding="utf-8")
     assert "subprocess" not in src
     assert "os.system" not in src
+
+
+# ---------------------------------------------------------------------------
+# Linked-worktree ground truth: a `.git` FILE is followed to its `gitdir:`
+# ---------------------------------------------------------------------------
+
+_UNKNOWN = {"momentum": "unknown", "stalled_days": None, "salience": 0.0}
+
+
+def test_linked_worktree_absolute_gitdir(tmp_path):
+    """An absolute `gitdir:` resolves the worktree root and its own reflog;
+    repeated calls return identical results (read-only)."""
+    epoch = _NOW.timestamp() - 5 * 86400
+    worktree, gitdir = _write_linked_worktree(tmp_path, epoch)
+    sub = worktree / "sub"
+    sub.mkdir()
+    assert store._repo_root(start=sub) == worktree.resolve()
+    assert store._git_dir(worktree) == gitdir.resolve()
+    assert store._last_commit_epoch(worktree) == float(int(epoch))
+    assert store._last_commit_epoch(worktree) == float(int(epoch))
+    result = store.goal_momentum({}, repo_root=worktree, now=_NOW)
+    assert result["momentum"] == "stalled"
+    assert abs(result["stalled_days"] - 5) <= 1
+
+
+def test_linked_worktree_relative_gitdir(tmp_path):
+    """A relative `gitdir:` resolves against the directory holding `.git`."""
+    epoch = _NOW.timestamp() - 5 * 86400
+    worktree, gitdir = _write_linked_worktree(tmp_path, epoch, relative=True)
+    assert (worktree / ".git").read_text(encoding="utf-8").startswith("gitdir: ..")
+    sub = worktree / "sub"
+    sub.mkdir()
+    assert store._repo_root(start=sub) == worktree.resolve()
+    assert store._git_dir(worktree) == gitdir.resolve()
+    assert store._last_commit_epoch(worktree) == float(int(epoch))
+
+
+def test_nested_linked_worktree_resolves_to_nearest_candidate(tmp_path):
+    """A linked worktree nested inside a checkout with its own `.git`
+    directory resolves to the worktree and reads the worktree's reflog."""
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    _write_git(parent, _NOW.timestamp() - 9 * 86400)
+    worktree, _ = _write_linked_worktree(parent, _NOW.timestamp())
+    sub = worktree / "sub"
+    sub.mkdir()
+    root = store._repo_root(start=sub)
+    assert root == worktree.resolve()
+    assert store._last_commit_epoch(root) == float(int(_NOW.timestamp()))
+    assert store.goal_momentum({}, repo_root=root, now=_NOW)["momentum"] == "moving"
+
+
+def test_malformed_dot_git_file_yields_unknown(tmp_path):
+    """An empty `.git` file, one without a `gitdir:` line, and a `gitdir:`
+    target that does not exist each yield no git dir; with no valid ancestor
+    momentum is the benign unknown default and nothing raises."""
+    cases = ("", "not a gitdir line\n", "gitdir: %s\n" % (tmp_path / "missing"))
+    for index, text in enumerate(cases):
+        base = tmp_path / ("case%d" % index)
+        worktree, _ = _write_linked_worktree(base, _NOW.timestamp(), dot_git_text=text)
+        assert store._git_dir(worktree) is None
+        assert store._last_commit_epoch(worktree) is None
+        root = store._repo_root(start=worktree)
+        assert root is None
+        assert store.goal_momentum({}, repo_root=root, now=_NOW) == _UNKNOWN
+        assert store.goal_momentum({}, repo_root=worktree, now=_NOW) == _UNKNOWN
+
+
+def test_dot_git_directory_control_unchanged(tmp_path):
+    """A `.git` directory behaves exactly as before."""
+    repo = tmp_path / "repo"
+    epoch = _NOW.timestamp() - 3 * 86400
+    _write_git(repo, epoch)
+    sub = repo / "sub"
+    sub.mkdir()
+    assert store._repo_root(start=sub) == repo.resolve()
+    assert store._git_dir(repo) == repo / ".git"
+    assert store._last_commit_epoch(repo) == float(int(epoch))
+    assert store.goal_momentum({}, repo_root=repo, now=_NOW)["momentum"] == "stalled"
+
+
+def test_truncated_final_reflog_line_returns_none(tmp_path):
+    """A partially written last reflog line (a git write racing the read)
+    yields None and unknown momentum, never an exception."""
+    worktree, gitdir = _write_linked_worktree(tmp_path, _NOW.timestamp())
+    reflog = gitdir / "logs" / "HEAD"
+    reflog.write_text(
+        reflog.read_text(encoding="utf-8")
+        + "%s %s Dr Mani <mani@exa" % ("b" * 40, "c" * 40),
+        encoding="utf-8",
+    )
+    assert store._git_dir(worktree) == gitdir.resolve()
+    assert store._last_commit_epoch(worktree) is None
+    assert store.goal_momentum({}, repo_root=worktree, now=_NOW) == _UNKNOWN
 
 
 # ---------------------------------------------------------------------------

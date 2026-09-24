@@ -12,6 +12,16 @@ Plugin-own keys (read from the entry dict):
                           also gates reflection (checked in maybe_reflect)
     confidence_threshold  float, clamped [0,1], default 0.6 (APPR-03)
     deadline_seconds      float, clamped [0.5, 10.0], default 8.0 (R1)
+                          Maximum seconds spent waiting for the appraisal
+                          future. Busy workers cause an immediate skip instead
+                          of queueing another appraisal or reflection request.
+                          Also passed to the host as its request timeout.
+                          On expiry, return no appraisal so Hermes can continue;
+                          pending work is cancelled, but a running request is
+                          NOT cancelled and keeps the shared worker busy. This is
+                          not a deadline for the whole hook or process exit.
+                          Larger values can delay the reply for longer; values
+                          above 10.0 are reduced to 10.0 by configuration loading.
     history_chars         int, default 4000
     max_tokens            int, default 700
 
@@ -20,6 +30,8 @@ Reflection keys (REFL-01, Phase 3):
     reflect_every_n_turns     int, clamped [1, 50], default 5 — debounce
     reflect_max_tokens        int, default 700
     reflect_deadline_seconds  float, clamped [0.5, 10.0], default 8.0
+                              Same waiting/cancellation limits as appraisal;
+                              skipped/failed reflection keeps its watermark.
 
 Drive keys (DRIVE-06, Phase 7):
     drive_enabled             bool, default True — the SEPARATE drive kill

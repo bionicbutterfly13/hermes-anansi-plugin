@@ -6,9 +6,14 @@ No SQL here (store.py owns the DB), no host imports at module top level
 
 Mechanics (APPR-01..03, APPR-06, SAFE-01; 02-CONTEXT locked decisions):
 - One ctx.llm.complete_structured JSON call per eligible turn, executed in
-  a persistent single-worker ThreadPoolExecutor; future.result(timeout=...)
-  is the hard wall-clock deadline. On timeout the background call is
-  discarded — never joined.
+  a persistent single-worker ThreadPoolExecutor shared with reflection.
+  Admission is atomic: busy callers skip instead of queueing more work.
+  future.result(timeout=...) bounds this caller's wait; the same deadline
+  is passed to the host as its request timeout. On timeout, cancel pending
+  work and return no signals. A running request cannot be cancelled here:
+  its eventual result is unused, and it keeps the shared worker busy until
+  finished. Python also waits for executor threads at process exit. This
+  is not a deadline for the whole hook or process.
 - Zero retries except the single trust-gate fallback: if a configured model
   override is denied (PluginLlmTrustError), retry once with the host's
   active model, then fail open.
@@ -155,7 +160,7 @@ class AppraisalResult:
     succeeded; outcome feeds telemetry directly."""
 
     signals: Optional[dict]
-    outcome: str  # ok|timeout|parse_fail|llm_error|trust_fallback
+    outcome: str  # ok|timeout|parse_fail|llm_error|trust_fallback|skipped:worker_busy
     wall_ms: int
     model: str
     tokens_in: int
@@ -260,6 +265,8 @@ def build_context(user_message, conversation_history, snapshot, history_chars,
 
 _executor = None
 _executor_lock = threading.Lock()
+_submission_lock = threading.Lock()
+_active_future = None
 
 
 def _get_executor() -> ThreadPoolExecutor:
@@ -273,11 +280,37 @@ def _get_executor() -> ThreadPoolExecutor:
     return _executor
 
 
+def _submit_if_idle(worker, *, expires_at):
+    """Reserve the shared worker atomically, or return None without queueing.
+
+    Track the future, not the caller's wait: a timed-out RUNNING future still
+    owns the slot. No completion callback is needed; done() covers success,
+    failure and pending cancellation. Both appraisal and reflection use this
+    gate. The lock covers admission only, never the model call or its wait.
+    """
+    global _active_future
+
+    def _before_deadline():
+        # Cancellation can lose the race with executor startup. Even if the
+        # future is already RUNNING, don't start expired work on the provider.
+        if time.monotonic() >= expires_at:
+            raise FuturesTimeoutError("request expired before worker entry")
+        return worker()
+
+    with _submission_lock:
+        if _active_future is not None and not _active_future.done():
+            return None
+        _active_future = _get_executor().submit(_before_deadline)
+        return _active_future
+
+
 def _reset_executor_for_tests() -> None:
     """Discard the executor (e.g. after a deliberately-stuck timeout test)."""
-    global _executor
-    with _executor_lock:
-        stale, _executor = _executor, None
+    global _executor, _active_future
+    with _submission_lock:
+        with _executor_lock:
+            stale, _executor = _executor, None
+        _active_future = None
     if stale is not None:
         stale.shutdown(wait=False, cancel_futures=True)
 
@@ -344,11 +377,25 @@ def run_appraisal(*, llm, user_message, conversation_history, snapshot, cfg,
                     return llm.complete_structured(**call_kwargs), True
             return llm.complete_structured(**call_kwargs), False
 
-        future = _get_executor().submit(_worker)
+        future = _submit_if_idle(_worker, expires_at=time.monotonic() + deadline)
+        if future is None:
+            return AppraisalResult(
+                signals=None,
+                outcome="skipped:worker_busy",
+                wall_ms=_wall_ms(),
+                model=requested_model or "",
+                tokens_in=0,
+                tokens_out=0,
+                error=None,
+            )
         try:
             result, used_fallback = future.result(timeout=deadline)
         except FuturesTimeoutError:
-            # Background call is discarded — do NOT shutdown/join.
+            # Stop waiting and return no appraisal so the host can continue.
+            # Cancel pending work. A running request cannot be cancelled this
+            # way: retain its reservation until it finishes. Its eventual
+            # result is unused and it can still delay process exit.
+            future.cancel()
             return AppraisalResult(
                 signals=None,
                 outcome="timeout",

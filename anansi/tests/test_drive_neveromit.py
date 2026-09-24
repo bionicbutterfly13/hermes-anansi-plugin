@@ -424,6 +424,8 @@ def test_persisted_flagged_priorities_survive_empty_signal_full_hook(tmp_path, m
     assert {"protected priority %02d" % index for index in range(55)} <= persisted
 
     cfg = _cfg(drive_domains=["inside-domain"])
+    # Hermetic: momentum must not depend on the ambient checkout's reflog age.
+    monkeypatch.setattr(store, "_repo_root", lambda start=None: None)
     output = _run_hook(
         monkeypatch, db_path, cfg=cfg, signals={}, session_id="empty-success"
     )
