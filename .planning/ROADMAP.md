@@ -173,6 +173,26 @@ Phase identifiers map the seven source specs; they do not impose a new total ord
 
 - [x] 08-05-PLAN.md: Handle non-finite integer configuration and verify per-session diagnostics.
 
+### Phase 08.1: Daily-use v1 (INSERTED)
+
+**Goal:** Make Anansi a v1 that Dr. Mani uses every day in the `chief-of-staff` Hermes profile, then decide Phases 9-14 from real use. Decisions: `.planning/grill-logs/2026-09-23-anansi-valuable-completion.md` (Q1-Q9).
+**Requirements**: TBD (derived at plan time from grill-log Q2-Q8)
+**Depends on:** Phase 8
+**Plans:** 6 plans (to be written by `$gsd-plan-phase 08.1`)
+
+Plans:
+
+- [ ] 08.1-01 — Lineage cleanup: commit quick task 260912-cqc, fix `_repo_root()` for linked-worktree `.git` files, merge; file the 4 deferred drafts as Phase 14 inputs; close PR #2 (Q2).
+- [ ] 08.1-02 — Install on `chief-of-staff` via symlink; first authorized live smoke on the main model as the latency baseline (Q5, Q7).
+- [ ] 08.1-03 — Turn marker + "applies to this message only" line on each block; block-size telemetry (Q3).
+- [ ] 08.1-04 — User-invoked `/goal` slash command + `hermes anansi goals` CLI sharing one handler (Q4).
+- [ ] 08.1-05 — Register `anansi_appraisal` / `anansi_reflection` auxiliary tasks; `auxiliary.anansi_appraisal` = `openai-codex` / `gpt-6-sol` (Q6, corrected).
+- [ ] 08.1-06 — `enabled: false` also stops turn capture, with a regression test (Q8).
+
+**Exit gate (Q7):** `live_drive_smoke.py` exit 0 recorded; 7 days of telemetry with p50 <= 6s, timeouts <= 10%, parse_fail + llm_error <= 5%, median block size reported; day-7 review of 20 sampled blocks labeled useful/neutral/misleading. Decision rule: >= 50% useful and 0 misleading means proceed to Phase 9; < 25% useful means freeze; in between, the next increment is appraisal-prompt quality.
+
+**Gate on later phases:** Phases 9-14 do not start until the 08.1 decision rule is recorded.
+
 ### Phase 9: Autobiographical User Model
 
 **Goal:** Plan the scope recorded in .planning/reference/002-autobiographical-user-model/spec.md within the binding constitution and source acceptance contract.
