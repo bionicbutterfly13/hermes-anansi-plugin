@@ -176,18 +176,33 @@ Phase identifiers map the seven source specs; they do not impose a new total ord
 ### Phase 08.1: Daily-use v1 (INSERTED)
 
 **Goal:** Make Anansi a v1 that Dr. Mani uses every day in the `chief-of-staff` Hermes profile, then decide Phases 9-14 from real use. Decisions: `.planning/grill-logs/2026-09-23-anansi-valuable-completion.md` (Q1-Q9).
-**Requirements**: TBD (derived at plan time from grill-log Q2-Q8)
+**Requirements**: REQ-08.1-02, REQ-08.1-03, REQ-08.1-04, REQ-08.1-05, REQ-08.1-06, REQ-08.1-07, REQ-08.1-08
+**Requirement source:** `.planning/phases/08.1-daily-use-v1/08.1-RESEARCH.md` Phase Requirements table (derived from D-02..D-08)
 **Depends on:** Phase 8
-**Plans:** 6 plans (to be written by `$gsd-plan-phase 08.1`)
+**Plans:** 6 plans
 
 Plans:
 
-- [ ] 08.1-01 — Lineage cleanup: commit quick task 260912-cqc, fix `_repo_root()` for linked-worktree `.git` files, merge; file the 4 deferred drafts as Phase 14 inputs; close PR #2 (Q2).
-- [ ] 08.1-02 — Install on `chief-of-staff` via symlink; first authorized live smoke on the main model as the latency baseline (Q5, Q7).
-- [ ] 08.1-03 — Turn marker + "applies to this message only" line on each block; block-size telemetry (Q3).
-- [ ] 08.1-04 — User-invoked `/goal` slash command + `hermes anansi goals` CLI sharing one handler (Q4).
-- [ ] 08.1-05 — Register `anansi_appraisal` / `anansi_reflection` auxiliary tasks; `auxiliary.anansi_appraisal` = `openai-codex` / `gpt-6-sol` (Q6, corrected).
-- [ ] 08.1-06 — `enabled: false` also stops turn capture, with a regression test (Q8).
+**Wave 1**
+
+- [ ] 08.1-01-PLAN.md — Lineage cleanup: commit quick task 260912-cqc, fix `_repo_root()`/`_last_commit_epoch()` for linked-worktree `.git` files (hermetic never-omit pin), merge `--no-ff` and push; file the 4 drafts as DRAFT Phase 14 inputs; close PR #2; delete `001-close-known-gaps` local and remote (Q2, D-02, D-15).
+
+**Wave 2** (08.1-02 may halt at Dr. Mani's repair confirmation; 08.1-03..06 do not depend on it)
+
+- [ ] 08.1-02-PLAN.md — Dr. Mani confirms the chief-of-staff repair; D-10 host re-sync and gates; symlink install on `chief-of-staff`; first live smoke on the main model as the latency baseline (Q5, Q7).
+- [ ] 08.1-03-PLAN.md — `[anansi appraisal] turn N` header + "applies to this message only" framing; schema v6 `telemetry.block_tokens` with additive upgrade; window-scoped `telemetry_summary` (Q3).
+
+**Wave 3**
+
+- [ ] 08.1-04-PLAN.md — User-invoked `/anansi goals add|flag|status|list` + `hermes anansi goals ...` sharing one dispatcher; no `--files` (Q4, D-04 revised, D-11).
+
+**Wave 4**
+
+- [ ] 08.1-05-PLAN.md — Register `anansi_appraisal` / `anansi_reflection` auxiliary tasks with `task=` routing and main-model fallback; smoke `--task`/`--probe-host`; operator docs for `openai-codex` / `gpt-6-sol` (Q6, corrected).
+
+**Wave 5**
+
+- [ ] 08.1-06-PLAN.md — `enabled: false` also stops turn capture (regression + lifecycle invariant); live activation on chief-of-staff (gpt-6-sol config, model check, D-13 latency, rollback drill, clock start); blocking exit-gate checkpoint (Q7, Q8).
 
 **Exit gate (Q7):** `live_drive_smoke.py` exit 0 recorded; 7 days of telemetry with p50 <= 6s, timeouts <= 10%, parse_fail + llm_error <= 5%, median block size reported; day-7 review of 20 sampled blocks labeled useful/neutral/misleading. Decision rule: >= 50% useful and 0 misleading means proceed to Phase 9; < 25% useful means freeze; in between, the next increment is appraisal-prompt quality.
 
